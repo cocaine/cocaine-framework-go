@@ -1,4 +1,8 @@
-cocaine-framework-Go
-====================
+# cocaine-framework-GO
 
-Cocaine Go Framework
+Build:
+
+```
+source ./prepare_build.sh
+make
+```
