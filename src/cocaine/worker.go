@@ -151,7 +151,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 				case *Choke:
 					worker.logger.Info("Receive choke")
-					delete(worker.sessionss, msg.GetSessionID())
+					delete(worker.sessions, msg.GetSessionID())
 
 				case *Invoke:
 					worker.logger.Info(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.GetSessionID()))
@@ -160,7 +160,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 					resp := NewResponse(cur_session, worker.from_handlers)
 					worker.sessions[cur_session] = req
 					if callback, ok := bind[msg.Event]; ok {
-						callback(req, resp)
+						go callback(req, resp)
 					} else {
 						worker.logger.Info(fmt.Sprintf("There is no event handler for %s", msg.Event))
 					}
