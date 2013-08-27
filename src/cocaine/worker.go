@@ -148,21 +148,31 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 				case *Chunk:
 					worker.logger.Err("Receive chunk")
 					worker.sessions[msg.GetSessionID()].push(msg.Data)
+
 				case *Choke:
 					worker.logger.Info("Receive choke")
+					delete(worker.sessionss, msg.GetSessionID())
+
 				case *Invoke:
 					worker.logger.Info(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.GetSessionID()))
 					cur_session := msg.GetSessionID()
 					req := NewRequest()
 					resp := NewResponse(cur_session, worker.from_handlers)
 					worker.sessions[cur_session] = req
-					go bind[msg.Event](req, resp)
+					if callback, ok := bind[msg.Event]; ok {
+						callback(req, resp)
+					} else {
+						worker.logger.Info(fmt.Sprintf("There is no event handler for %s", msg.Event))
+					}
+
 				case *Heartbeat:
 					worker.logger.Info("Receive heartbeat. Stop disown_timer")
 					worker.disown_timer.Stop()
+
 				case *Terminate:
 					worker.logger.Info("Receive terminate")
 					os.Exit(0)
+
 				default:
 					worker.logger.Info("Unknown message")
 				}
@@ -173,6 +183,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 		case <-worker.disown_timer.C:
 			worker.logger.Err("Disowned")
+
 		case outcoming := <-worker.from_handlers:
 			worker.wr_in <- outcoming
 		}
