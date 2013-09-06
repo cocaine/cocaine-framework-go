@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+var (
+	logger  *cocaine.Logger
+	storage *cocaine.Storage
+)
+
 func dummy(request *cocaine.Request, response *cocaine.Response) {
 	logger := cocaine.NewLogger()
 	logger.Info("FROM HANDLER")
@@ -24,12 +29,7 @@ func echo(request *cocaine.Request, response *cocaine.Response) {
 }
 
 func app_list(request *cocaine.Request, response *cocaine.Response) {
-	logger := cocaine.NewLogger()
 	<-request.Read()
-	storage, err := cocaine.NewStorage("localhost", 10053)
-	if err != nil {
-		logger.Err(fmt.Sprintf("Unable to create storage %s", err))
-	}
 	if list := <-storage.Find("apps", []string{"app"}); list.Err != nil {
 		logger.Err(fmt.Sprintf("Unable to fetch  list%s", list.Err))
 		response.Write("fail")
@@ -40,11 +40,22 @@ func app_list(request *cocaine.Request, response *cocaine.Response) {
 	}
 }
 
+func http_test(request *cocaine.Request, response *cocaine.Response) {
+	req := cocaine.UnpackProxyRequest(<-request.Read())
+	response.Write(cocaine.WriteHead(200, [][2]string{{"Content-Type", "text/html"}}))
+	ans := fmt.Sprintf("Method: %s, Uri: %s, UA: %s", req.Method, req.URL, req.UserAgent())
+	response.Write(ans)
+	response.Close()
+}
+
 func main() {
+	logger = cocaine.NewLogger()
+	storage, _ = cocaine.NewStorage("localhost", 10053)
 	binds := map[string]cocaine.EventHandler{
 		"testevent": dummy,
 		"echo":      echo,
-		"test":      app_list}
+		"test":      app_list,
+		"http":      http_test}
 	Worker := cocaine.NewWorker()
 	Worker.Loop(binds)
 }

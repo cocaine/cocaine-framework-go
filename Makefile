@@ -3,3 +3,4 @@ all:
 	go build cocaine
 	go build testapp
 	go build testcli
+	go build ntp.go

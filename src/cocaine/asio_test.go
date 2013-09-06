@@ -3,6 +3,8 @@ package cocaine
 import (
 	//"bytes"
 	"codec"
+	"fmt"
+	"os"
 	"testing"
 )
 
@@ -59,25 +61,25 @@ func TestStorage(t *testing.T) {
 		t.Error("Unable to create storage", err)
 	}
 	// Find all apps
-	if apps := <-s.Find("apps", []string{"app"}); apps.err != nil {
-		t.Error("Storage.Find error", apps.err)
+	if apps := <-s.Find("apps", []string{"app"}); apps.Err != nil {
+		t.Error("Storage.Find error", apps.Err)
 	} else {
 		t.Log(apps.Res)
 	}
 
-	if write := <-s.Write("GOTEST", "TEST", []byte("TESTDATA"), []string{"A", "B"}); write.err != nil {
+	if write := <-s.Write("GOTEST", "TEST", []byte("TESTDATA"), []string{"A", "B"}); write.Err != nil {
 		t.Error("Fail")
 	} else {
 		t.Log("Write OK")
 	}
 
-	if manifest := <-s.Read("GOTEST", "TEST"); manifest.err != nil {
-		t.Error("Error", manifest.err)
+	if manifest := <-s.Read("GOTEST", "TEST"); manifest.Err != nil {
+		t.Error("Error", manifest.Err)
 	} else {
 		t.Log("Ok", manifest.Res)
 	}
-	if remove := <-s.Remove("GOTEST", "TEST2"); remove.err != nil {
-		t.Error(remove.err)
+	if remove := <-s.Remove("GOTEST", "TEST2"); remove.Err != nil {
+		t.Error(remove.Err)
 	} else {
 		t.Log("Remove OK")
 	}
@@ -90,15 +92,32 @@ func TestApplication(t *testing.T) {
 		t.Error("Unable to create app", err)
 	}
 
-	if enq := <-app.Enqueue("echo", []byte("PING")); enq.err != nil {
-		t.Error("Fail enqueu", enq.err)
+	if enq := <-app.Enqueue("echo", []byte("PING")); enq.Err != nil {
+		t.Error("Fail enqueu", enq.Err)
 	} else {
 		t.Log("OK")
 	}
-	if info := <-app.Info(); info.err != nil {
-		t.Error("Fail info", info.err)
+	if info := <-app.Info(); info.Err != nil {
+		t.Error("Fail info", info.Err)
 	} else {
 		t.Log(info.Res)
 	}
 
+}
+
+// method, url, version, headers, self._body
+func TestReq(t *testing.T) {
+	fmt.Println("START")
+	file, err := os.Open("/Users/noxiouz/Documents/github/cocaine-framework-Go/REQ") // For read access.
+	data := make([]byte, 1024)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(file)
+	_, err = file.Read(data)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println(UnpackProxyRequest(data))
 }
