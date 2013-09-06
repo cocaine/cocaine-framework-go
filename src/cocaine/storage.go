@@ -27,14 +27,20 @@ type StorageFindRes struct {
 	err error
 }
 
+// Try make as template
 func (storage *Storage) Find(namespace string, tags []string) chan StorageFindRes {
 	Out := make(chan StorageFindRes)
 	go func() {
-		var v []string
 		if res := <-storage.Call(STORAGE_FIND, namespace, tags); res.err == nil {
-			//codec.NewDecoderBytes(res.result, h).Decode(&v)
-
-			Out <- StorageFindRes{Res: v, err: nil}
+			if res_as_strings, ok := res.result.([]interface{}); ok {
+				v := make([]string, 0, len(res_as_strings))
+				for _, item := range res_as_strings {
+					v = append(v, string(item.([]uint8)))
+				}
+				Out <- StorageFindRes{Res: v, err: nil}
+			} else {
+				Out <- StorageFindRes{Res: nil, err: &ServiceError{-100, "Invalid  result type"}}
+			}
 		} else {
 			Out <- StorageFindRes{Res: nil, err: res.err}
 		}
@@ -50,10 +56,7 @@ type StorageReadRes struct {
 func (storage *Storage) Read(namespace string, key string) chan StorageReadRes {
 	Out := make(chan StorageReadRes)
 	go func() {
-		//var v string
 		if res := <-storage.Call(STORAGE_READ, namespace, key); res.err == nil {
-			//err := codec.NewDecoderBytes(res.result, h).Decode(&v)
-			//fmt.Println(err)
 			Out <- StorageReadRes{Res: string(res.result.([]uint8)), err: nil}
 		} else {
 			Out <- StorageReadRes{Res: "", err: res.err}

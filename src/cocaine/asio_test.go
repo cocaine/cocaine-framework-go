@@ -68,7 +68,7 @@ func TestStorage(t *testing.T) {
 	if write := <-s.Write("GOTEST", "TEST", []byte("TESTDATA"), []string{"A", "B"}); write.err != nil {
 		t.Error("Fail")
 	} else {
-		t.Log("OK")
+		t.Log("Write OK")
 	}
 
 	if manifest := <-s.Read("GOTEST", "TEST"); manifest.err != nil {
@@ -79,7 +79,7 @@ func TestStorage(t *testing.T) {
 	if remove := <-s.Remove("GOTEST", "TEST2"); remove.err != nil {
 		t.Error(remove.err)
 	} else {
-		t.Log("OK")
+		t.Log("Remove OK")
 	}
 }
 
