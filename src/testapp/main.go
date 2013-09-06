@@ -2,6 +2,8 @@ package main
 
 import (
 	"cocaine"
+	"fmt"
+	"strings"
 )
 
 func dummy(request *cocaine.Request, response *cocaine.Response) {
@@ -21,10 +23,28 @@ func echo(request *cocaine.Request, response *cocaine.Response) {
 	response.Close()
 }
 
+func app_list(request *cocaine.Request, response *cocaine.Response) {
+	logger := cocaine.NewLogger()
+	<-request.Read()
+	storage, err := cocaine.NewStorage("localhost", 10053)
+	if err != nil {
+		logger.Err(fmt.Sprintf("Unable to create storage %s", err))
+	}
+	if list := <-storage.Find("apps", []string{"app"}); list.Err != nil {
+		logger.Err(fmt.Sprintf("Unable to fetch  list%s", list.Err))
+		response.Write("fail")
+		response.Close()
+	} else {
+		response.Write(strings.Join(list.Res, ","))
+		response.Close()
+	}
+}
+
 func main() {
 	binds := map[string]cocaine.EventHandler{
 		"testevent": dummy,
-		"echo":      echo}
+		"echo":      echo,
+		"test":      app_list}
 	Worker := cocaine.NewWorker()
 	Worker.Loop(binds)
 }

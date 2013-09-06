@@ -25,21 +25,21 @@ func (app *Application) Enqueue(event string, data []byte) chan ServiceResult {
 
 type ApplicationInfoRes struct {
 	Res map[string]interface{}
-	err error
+	Err error
 }
 
 func (app *Application) Info() chan ApplicationInfoRes {
 	Out := make(chan ApplicationInfoRes)
 	go func() {
 		info := make(map[string]interface{})
-		if res := <-app.Call(APPLICATION_INFO, []interface{}{}); res.err == nil {
+		if res := <-app.Call(APPLICATION_INFO, []interface{}{}); res.Err == nil {
 			// Add some type assertations in future
-			for k, v := range res.result.(map[interface{}]interface{}) {
+			for k, v := range res.Res.(map[interface{}]interface{}) {
 				info[k.(string)] = v
 			}
-			Out <- ApplicationInfoRes{Res: info, err: nil}
+			Out <- ApplicationInfoRes{Res: info, Err: nil}
 		} else {
-			Out <- ApplicationInfoRes{Res: nil, err: res.err}
+			Out <- ApplicationInfoRes{Res: nil, Err: res.Err}
 		}
 	}()
 	return Out

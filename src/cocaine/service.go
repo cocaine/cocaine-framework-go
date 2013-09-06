@@ -7,8 +7,8 @@ import (
 )
 
 type ServiceResult struct {
-	result interface{}
-	err    error
+	Res interface{}
+	Err error
 }
 
 type ServiceError struct {

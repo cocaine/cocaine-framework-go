@@ -24,25 +24,25 @@ func NewStorage(host string, port uint64) (*Storage, error) {
 
 type StorageFindRes struct {
 	Res []string
-	err error
+	Err error
 }
 
-// Try make as template
+// Try to make as template
 func (storage *Storage) Find(namespace string, tags []string) chan StorageFindRes {
 	Out := make(chan StorageFindRes)
 	go func() {
-		if res := <-storage.Call(STORAGE_FIND, namespace, tags); res.err == nil {
-			if res_as_strings, ok := res.result.([]interface{}); ok {
+		if res := <-storage.Call(STORAGE_FIND, namespace, tags); res.Err == nil {
+			if res_as_strings, ok := res.Res.([]interface{}); ok {
 				v := make([]string, 0, len(res_as_strings))
 				for _, item := range res_as_strings {
 					v = append(v, string(item.([]uint8)))
 				}
-				Out <- StorageFindRes{Res: v, err: nil}
+				Out <- StorageFindRes{Res: v, Err: nil}
 			} else {
-				Out <- StorageFindRes{Res: nil, err: &ServiceError{-100, "Invalid  result type"}}
+				Out <- StorageFindRes{Res: nil, Err: &ServiceError{-100, "Invalid  result type"}}
 			}
 		} else {
-			Out <- StorageFindRes{Res: nil, err: res.err}
+			Out <- StorageFindRes{Res: nil, Err: res.Err}
 		}
 	}()
 	return Out
@@ -50,16 +50,16 @@ func (storage *Storage) Find(namespace string, tags []string) chan StorageFindRe
 
 type StorageReadRes struct {
 	Res string
-	err error
+	Err error
 }
 
 func (storage *Storage) Read(namespace string, key string) chan StorageReadRes {
 	Out := make(chan StorageReadRes)
 	go func() {
-		if res := <-storage.Call(STORAGE_READ, namespace, key); res.err == nil {
-			Out <- StorageReadRes{Res: string(res.result.([]uint8)), err: nil}
+		if res := <-storage.Call(STORAGE_READ, namespace, key); res.Err == nil {
+			Out <- StorageReadRes{Res: string(res.Res.([]uint8)), Err: nil}
 		} else {
-			Out <- StorageReadRes{Res: "", err: res.err}
+			Out <- StorageReadRes{Res: "", Err: res.Err}
 		}
 	}()
 	return Out
