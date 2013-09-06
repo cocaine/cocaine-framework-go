@@ -114,6 +114,7 @@ func (response *Response) Close() {
 //Worker
 type Worker struct {
 	pipe            *Pipe
+	unpacker        *StreamUnpacker
 	uuid            string
 	wr_in           chan RawMessage
 	r_out           chan RawMessage
@@ -128,9 +129,16 @@ func NewWorker() *Worker {
 	wr_in, wr_out := Transmite() // Write to buffer: wr_in <-
 	r_in, r_out := Transmite()   // Read from buffer: <- r_out
 	pipe := NewPipe("unix", flag_endpoint, &wr_out, &r_in)
-	w := Worker{pipe, flag_uuid, wr_in, r_out, NewLogger(),
-		time.NewTimer(HEARTBEAT_TIMEOUT), time.NewTimer(DISOWN_TIMEOUT), make(map[int64](*Request)),
-		make(chan RawMessage)}
+	w := Worker{pipe: pipe,
+		unpacker:        NewStreamUnpacker(),
+		uuid:            flag_uuid,
+		wr_in:           wr_in,
+		r_out:           r_out,
+		logger:          NewLogger(),
+		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
+		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
+		sessions:        make(map[int64](*Request)),
+		from_handlers:   make(chan RawMessage)}
 	w.disown_timer.Stop()
 	w.handshake()
 	w.heartbeat()
@@ -141,8 +149,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 	for {
 		select {
 		case answer := <-worker.r_out:
-			left := 0
-			msgs := DecodeRaw(answer, &left)
+			msgs := worker.unpacker.Feed(answer)
 			for _, rawmsg := range msgs {
 				switch msg := rawmsg.(type) {
 				case *Chunk:

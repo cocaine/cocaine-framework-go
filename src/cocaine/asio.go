@@ -9,7 +9,6 @@ func Transmite() (In chan RawMessage, Out chan RawMessage) {
 	In = make(chan RawMessage)
 	Out = make(chan RawMessage)
 	go func() {
-		log.Println("Start buffer")
 		var pending []RawMessage
 		for {
 			var out chan RawMessage
@@ -38,7 +37,7 @@ type Pipe struct {
 func NewPipe(family, endpoint string, input *chan RawMessage, output *chan RawMessage) *Pipe {
 	conn, err := net.Dial(family, endpoint)
 	if err != nil {
-		log.Println("Connection error", err)
+		log.Fatal("Connection error", err)
 	}
 	pipe := Pipe{&conn, input, output}
 	pipe.writeloop()
@@ -52,7 +51,7 @@ func (pipe *Pipe) writeloop() {
 			log.Println("Write", incoming, len(incoming))
 			count, err := (*pipe.conn).Write(incoming)
 			if err != nil {
-				log.Println(err)
+				log.Fatal(err)
 			} else {
 				log.Println("Count", count)
 			}
@@ -66,9 +65,9 @@ func (pipe *Pipe) readloop() {
 		for {
 			count, err := (*pipe.conn).Read(buf)
 			if err != nil {
-				log.Println("Read error:", err)
+				log.Fatal("Read error:", err)
 			} else {
-				log.Println("Receive", count, " bytes", buf[:count])
+				//log.Println("Receive", count, " bytes", buf[:count])
 				*pipe.output <- buf[:count]
 			}
 		}

@@ -23,18 +23,19 @@ type ResolveResult struct {
 }
 
 type Locator struct {
-	host  string
-	port  uint64
-	pipe  *Pipe
-	wr_in chan RawMessage
-	r_out chan RawMessage
+	host     string
+	port     uint64
+	pipe     *Pipe
+	unpacker *StreamUnpacker
+	wr_in    chan RawMessage
+	r_out    chan RawMessage
 }
 
 func NewLocator(host string, port uint64) *Locator {
 	wr_in, wr_out := Transmite()
 	r_in, r_out := Transmite()
 	pipe := NewPipe("tcp", fmt.Sprintf("%s:%d", host, port), &wr_out, &r_in)
-	return &Locator{host, port, pipe, wr_in, r_out}
+	return &Locator{host, port, pipe, NewStreamUnpacker(), wr_in, r_out}
 }
 
 func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
@@ -48,7 +49,7 @@ func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
 	MH.MapType = reflect.TypeOf(map[int]string(nil))
 	err := codec.NewDecoderBytes(chunk, &MH).Decode(&v)
 	if err != nil {
-		log.Println("unpackchunk error", err)
+		log.Println("unpack chunk error", err)
 	}
 	if len(v) == 3 {
 		v_endpoint := v[0].([]interface{})
@@ -68,17 +69,16 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
 		raw := Pack(&msg)
 		locator.wr_in <- raw
-		all := false
-		for !all {
+		closed := false
+		for !closed {
 			answer := <-locator.r_out
-			left := 0
-			msgs := DecodeRaw(answer, &left)
+			msgs := locator.unpacker.Feed(answer) //DecodeRaw(answer, &left)
 			for _, item := range msgs {
 				switch id := item.GetTypeID(); id {
 				case CHUNK:
 					resolveresult = locator.unpackchunk(item.GetPayload()[0].([]byte))
 				case CHOKE:
-					all = true
+					closed = true
 				}
 			}
 		}

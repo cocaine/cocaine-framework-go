@@ -1,7 +1,7 @@
 package cocaine
 
 import (
-	"bufio"
+	//"bufio"
 	"bytes"
 	"codec"
 	"fmt"
@@ -221,10 +221,15 @@ func UnpackMessage(input []interface{}) Message {
 	}
 }
 
-func DecodeRaw(input []byte, bytesleft *int) []Message {
+type StreamUnpacker struct {
+	buf []byte
+}
+
+func (unpacker *StreamUnpacker) Feed(data []byte) []Message {
 	var msgs []Message
-	buf := bufio.NewReader(bytes.NewReader(input))
-	dec := codec.NewDecoder(buf, h)
+	unpacker.buf = append(unpacker.buf, data...)
+	tmp := bytes.NewBuffer(unpacker.buf)
+	dec := codec.NewDecoder(tmp, h)
 	for {
 		var res []interface{}
 		err := dec.Decode(&res)
@@ -233,10 +238,15 @@ func DecodeRaw(input []byte, bytesleft *int) []Message {
 				log.Println(err)
 			}
 			break
+		} else {
+			msgs = append(msgs, UnpackMessage(res))
+			unpacker.buf = unpacker.buf[len(unpacker.buf)-tmp.Len():]
 		}
-		msg := UnpackMessage(res)
-		msgs = append(msgs, msg)
+
 	}
-	*bytesleft = buf.Buffered()
 	return msgs
+}
+
+func NewStreamUnpacker() *StreamUnpacker {
+	return &StreamUnpacker{make([]byte, 0)}
 }
