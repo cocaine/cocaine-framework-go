@@ -34,7 +34,6 @@ func UnpackProxyRequest(raw []byte) *http.Request {
 	for _, item := range v[3].(Headers) {
 		r.Header.Set(item[0], item[1])
 		if item[0] == "X-Real-IP" {
-			fmt.Println(item[1])
 			r.RemoteAddr = item[1]
 		}
 	}

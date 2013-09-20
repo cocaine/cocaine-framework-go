@@ -51,12 +51,9 @@ func NewPipe(family, endpoint string, input *chan RawMessage, output *chan RawMe
 func (pipe *Pipe) writeloop() {
 	go func() {
 		for incoming := range *pipe.input {
-			log.Println("Write", incoming, len(incoming))
-			count, err := (*pipe.conn).Write(incoming)
+			_, err := (*pipe.conn).Write(incoming)
 			if err != nil {
 				log.Fatal(err)
-			} else {
-				log.Println("Count", count)
 			}
 		}
 	}()
