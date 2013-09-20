@@ -17,6 +17,7 @@ func (endpoint *Endpoint) AsString() string {
 }
 
 type ResolveResult struct {
+	success bool
 	Endpoint
 	Version int64
 	API     map[int]string
@@ -56,7 +57,7 @@ func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
 		endpoint := Endpoint{string(v_endpoint[0].([]uint8)), v_endpoint[1].(uint64)}
 		version := v[1].(int64)
 		api := v[2].(map[int]string)
-		return ResolveResult{endpoint, version, api}
+		return ResolveResult{true, endpoint, version, api}
 	} else {
 		panic("Bad format")
 	}
@@ -66,6 +67,7 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 	Out := make(chan ResolveResult)
 	go func() {
 		var resolveresult ResolveResult
+		resolveresult.success = false
 		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
 		raw := Pack(&msg)
 		locator.wr_in <- raw
@@ -77,6 +79,7 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 				switch id := item.GetTypeID(); id {
 				case CHUNK:
 					resolveresult = locator.unpackchunk(item.GetPayload()[0].([]byte))
+					resolveresult.success = true
 				case CHOKE:
 					closed = true
 				}
