@@ -198,7 +198,15 @@ func UnpackMessage(input []interface{}) Message {
 		}
 	}()
 
-	session := input[1].(int64)
+	var session int64
+
+	switch input[1].(type) {
+	case uint64:
+		session = int64(input[1].(uint64))
+	case int64:
+		session = input[1].(int64)
+	}
+	
 	data := input[2].([]interface{})
 
 	switch input[0].(int64) {
