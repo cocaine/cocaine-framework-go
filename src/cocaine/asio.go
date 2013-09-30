@@ -3,6 +3,7 @@ package cocaine
 import (
 	"log"
 	"net"
+	"runtime/debug"
 )
 
 func Transmite() (In chan RawMessage, Out chan RawMessage) {
@@ -11,17 +12,19 @@ func Transmite() (In chan RawMessage, Out chan RawMessage) {
 	go func() {
 		var pending []RawMessage
 		for {
-			var out chan RawMessage
 			var first RawMessage
 			if len(pending) > 0 {
 				first = pending[0]
-				out = Out
-			}
-			select {
-			case incoming := <-In:
+				
+				select {
+				case incoming := <-In:
+					pending = append(pending, incoming)
+				case Out <- first:
+					pending = pending[1:]
+				}
+			} else {
+				incoming := <-In
 				pending = append(pending, incoming)
-			case out <- first:
-				pending = pending[1:]
 			}
 		}
 	}()
@@ -37,7 +40,7 @@ type Pipe struct {
 func NewPipe(family, endpoint string, input *chan RawMessage, output *chan RawMessage) *Pipe {
 	conn, err := net.Dial(family, endpoint)
 	if err != nil {
-		log.Fatal("Connection error", err)
+		log.Fatal("Connection error", err, family, endpoint, string(debug.Stack()))
 	}
 	pipe := Pipe{&conn, input, output}
 	pipe.writeloop()
@@ -48,12 +51,9 @@ func NewPipe(family, endpoint string, input *chan RawMessage, output *chan RawMe
 func (pipe *Pipe) writeloop() {
 	go func() {
 		for incoming := range *pipe.input {
-			log.Println("Write", incoming, len(incoming))
-			count, err := (*pipe.conn).Write(incoming)
+			_, err := (*pipe.conn).Write(incoming)
 			if err != nil {
 				log.Fatal(err)
-			} else {
-				log.Println("Count", count)
 			}
 		}
 	}()
@@ -67,8 +67,9 @@ func (pipe *Pipe) readloop() {
 			if err != nil {
 				log.Fatal("Read error:", err)
 			} else {
-				//log.Println("Receive", count, " bytes", buf[:count])
-				*pipe.output <- buf[:count]
+				bufferToSend := make([]byte, count)
+				copy(bufferToSend[:], buf[:count])
+				*pipe.output <- bufferToSend
 			}
 		}
 	}()

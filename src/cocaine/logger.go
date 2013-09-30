@@ -2,6 +2,7 @@ package cocaine
 
 import (
 	"fmt"
+	"runtime/debug"
 )
 
 type Logger struct {
@@ -23,6 +24,10 @@ const (
 func NewLogger() *Logger {
 	l := NewLocator("localhost", 10053)
 	info := <-l.Resolve("logging")
+	if info.success == false {
+		fmt.Printf("Unable to create logger, could not resolve logging service. Stack trace: \n %s", string(debug.Stack()))
+		return nil
+	}
 	wr_in, wr_out := Transmite()
 	r_in, r_out := Transmite()
 	pipe := NewPipe("tcp", info.Endpoint.AsString(), &wr_out, &r_in)
