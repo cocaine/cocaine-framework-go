@@ -32,26 +32,34 @@ const (
 type Request struct {
 	from_worker chan []byte
 	to_handler  chan []byte
+	quit        chan bool
 }
 
 type EventHandler func(*Request, *Response)
 
 func NewRequest() *Request {
-	request := Request{make(chan []byte), make(chan []byte)}
+	request := Request{make(chan []byte), make(chan []byte), make(chan bool)}
 	go func() {
 		var pending [][]byte
+		quit := false
 		for {
 			var out chan []byte
 			var first []byte
 			if len(pending) > 0 {
 				first = pending[0]
 				out = request.to_handler
+			} else {
+				if quit {
+					return
+				}
 			}
 			select {
 			case incoming := <-request.from_worker:
 				pending = append(pending, incoming)
 			case out <- first:
 				pending = pending[1:]
+			case <-request.quit:
+				quit = true
 			}
 		}
 	}()
@@ -59,13 +67,11 @@ func NewRequest() *Request {
 }
 
 func (request *Request) push(data []byte) {
-	go func() {
-		request.from_worker <- data
-	}()
+	request.from_worker <- data
 }
 
 func (request *Request) close() {
-	close(request.from_worker)
+	request.quit <- true
 }
 
 func (request *Request) Read() chan []byte {
@@ -77,24 +83,32 @@ type Response struct {
 	session      int64
 	from_handler chan []byte
 	to_worker    chan RawMessage
+	quit         chan bool
 }
 
 func NewResponse(session int64, to_worker chan RawMessage) *Response {
-	response := Response{session, make(chan []byte), to_worker}
+	response := Response{session, make(chan []byte), to_worker, make(chan bool)}
 	go func() {
 		var pending [][]byte
+		quit := false
 		for {
 			var out chan RawMessage
 			var first RawMessage
 			if len(pending) > 0 {
 				first = pending[0]
 				out = to_worker
+			} else {
+				if quit {
+					return
+				}
 			}
 			select {
 			case incoming := <-response.from_handler:
 				pending = append(pending, incoming)
 			case out <- first:
 				pending = pending[1:]
+			case quit = <-response.quit:
+				quit = true
 			}
 		}
 	}()
@@ -109,6 +123,7 @@ func (response *Response) Write(data interface{}) {
 
 func (response *Response) Close() {
 	response.from_handler <- Pack(&Choke{MessageInfo{CHOKE, response.session}})
+	response.quit <- true
 }
 
 //Worker
@@ -158,6 +173,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 				case *Choke:
 					worker.logger.Info("Receive choke")
+					worker.sessions[msg.GetSessionID()].close()
 					delete(worker.sessions, msg.GetSessionID())
 
 				case *Invoke:
