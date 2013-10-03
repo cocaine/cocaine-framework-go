@@ -1,11 +1,6 @@
-# cocaine-framework-GO
+# cocaine-framework-Go
 
-Build:
 
-```
-source ./prepare_build.sh
-make
-```
 
 ```
 go get github.com/cocaine/cocaine-framework-go/cocaine
