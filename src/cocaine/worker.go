@@ -85,24 +85,32 @@ type Response struct {
 	session      int64
 	from_handler chan []byte
 	to_worker    chan RawMessage
+	quit         chan bool
 }
 
 func NewResponse(session int64, to_worker chan RawMessage) *Response {
-	response := Response{session, make(chan []byte), to_worker}
+	response := Response{session, make(chan []byte), to_worker, make(chan bool)}
 	go func() {
 		var pending [][]byte
+		quit := false
 		for {
 			var out chan RawMessage
 			var first RawMessage
 			if len(pending) > 0 {
 				first = pending[0]
 				out = to_worker
+			} else {
+				if quit {
+					return
+				}
 			}
 			select {
 			case incoming := <-response.from_handler:
 				pending = append(pending, incoming)
 			case out <- first:
 				pending = pending[1:]
+			case quit = <-response.quit:
+				quit = true
 			}
 		}
 	}()
@@ -117,6 +125,7 @@ func (response *Response) Write(data interface{}) {
 
 func (response *Response) Close() {
 	response.from_handler <- Pack(&Choke{MessageInfo{CHOKE, response.session}})
+	response.quit <- true
 }
 
 //Worker
