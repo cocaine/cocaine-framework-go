@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cocaine"
+	"github.com/cocaine/cocaine-framework-go/cocaine"
 	"fmt"
 	"strings"
 )
