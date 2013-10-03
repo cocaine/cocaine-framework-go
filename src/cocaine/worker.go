@@ -32,26 +32,34 @@ const (
 type Request struct {
 	from_worker chan []byte
 	to_handler  chan []byte
+	quit        chan bool
 }
 
 type EventHandler func(*Request, *Response)
 
 func NewRequest() *Request {
-	request := Request{make(chan []byte), make(chan []byte)}
+	request := Request{make(chan []byte), make(chan []byte), make(chan bool)}
 	go func() {
 		var pending [][]byte
+		quit := false
 		for {
 			var out chan []byte
 			var first []byte
 			if len(pending) > 0 {
 				first = pending[0]
 				out = request.to_handler
+			} else {
+				if quit {
+					return
+				}
 			}
 			select {
 			case incoming := <-request.from_worker:
 				pending = append(pending, incoming)
 			case out <- first:
 				pending = pending[1:]
+			case <-request.quit:
+				quit = true
 			}
 		}
 	}()
@@ -65,7 +73,7 @@ func (request *Request) push(data []byte) {
 }
 
 func (request *Request) close() {
-	close(request.from_worker)
+	request.quit <- true
 }
 
 func (request *Request) Read() chan []byte {
@@ -158,6 +166,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 				case *Choke:
 					worker.logger.Info("Receive choke")
+					worker.sessions[msg.GetSessionID()].close()
 					delete(worker.sessions, msg.GetSessionID())
 
 				case *Invoke:
