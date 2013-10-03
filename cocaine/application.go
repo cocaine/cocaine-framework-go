@@ -1,7 +1,6 @@
 package cocaine
 
 import (
-//"codec"
 //"fmt"
 )
 

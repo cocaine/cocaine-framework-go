@@ -1,13 +1,11 @@
 package cocaine
 
 import (
-	//"bufio"
 	"bytes"
-	"codec"
+	"github.com/ugorji/go/codec"
 	"fmt"
 	"io"
 	"log"
-	//"reflect"
 )
 
 const (

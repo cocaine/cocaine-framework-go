@@ -2,7 +2,7 @@ package cocaine
 
 import (
 	"bytes"
-	"codec"
+	"github.com/ugorji/go/codec"
 	"fmt"
 	"net/http"
 	"reflect"

@@ -1,7 +1,7 @@
 package cocaine
 
 import (
-	"codec"
+	"github.com/ugorji/go/codec"
 	"fmt"
 	"log"
 )
