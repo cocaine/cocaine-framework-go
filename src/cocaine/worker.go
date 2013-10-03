@@ -67,9 +67,7 @@ func NewRequest() *Request {
 }
 
 func (request *Request) push(data []byte) {
-	go func() {
-		request.from_worker <- data
-	}()
+	request.from_worker <- data
 }
 
 func (request *Request) close() {
