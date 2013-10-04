@@ -1,10 +1,11 @@
 package cocaine
 
 import (
-	"github.com/ugorji/go/codec"
 	"flag"
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"os"
+	"runtime/debug"
 	"time"
 )
 
@@ -126,6 +127,10 @@ func (response *Response) Close() {
 	response.quit <- true
 }
 
+func (response *Response) ErrorMsg(code int, msg string) {
+	response.from_handler <- Pack(&ErrorMsg{MessageInfo{ERROR, response.session}, code, msg})
+}
+
 //Worker
 type Worker struct {
 	pipe            *Pipe
@@ -183,7 +188,18 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 					resp := NewResponse(cur_session, worker.from_handlers)
 					worker.sessions[cur_session] = req
 					if callback, ok := bind[msg.Event]; ok {
-						go callback(req, resp)
+						go func() {
+							defer func() {
+								if r := recover(); r != nil {
+									msg := fmt.Sprintf("Error in event: '%s', exception: %s", msg.Event, r)
+									worker.logger.Err(fmt.Sprintf("%s \n Stacktrace: \n %s",
+										msg, string(debug.Stack())))
+									resp.ErrorMsg(1, msg)
+									resp.Close()
+								}
+							}()
+							callback(req, resp)
+						}()
 					} else {
 						worker.logger.Info(fmt.Sprintf("There is no event handler for %s", msg.Event))
 					}
