@@ -2,8 +2,8 @@ package cocaine
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"net/http"
 	"reflect"
 )
@@ -31,15 +31,33 @@ func UnpackProxyRequest(raw []byte) *http.Request {
 	if err != nil {
 		fmt.Println("Error", err)
 	}
-	for _, item := range v[3].(Headers) {
-		r.Header.Set(item[0], item[1])
-		if item[0] == "X-Real-IP" {
-			r.RemoteAddr = item[1]
-		}
+	r.Header = CocaineHeaderToHttpHeader(v[3].(Headers))
+	if xRealIp := r.Header.Get("X-Real-IP"); xRealIp != "" {
+		r.RemoteAddr = xRealIp
 	}
 	return r
 }
 
-func WriteHead(code int, headers [][2]string) interface{} {
+func WriteHead(code int, headers Headers) interface{} {
 	return []interface{}{code, headers}
+}
+
+// convert http.Header(map[string][]string) to cocaine.Headers([][2]string)
+func HttpHeaderToCocaineHeader(header http.Header) Headers {
+	hdr := Headers{}
+	for headerName, headerValues := range header {
+		for _, headerValue := range headerValues {
+			hdr = append(hdr, [2]string{headerName, headerValue})
+		}
+	}
+	return hdr
+}
+
+// convert cocaine.Headers([][2]string) to http.Header(map[string][]string)
+func CocaineHeaderToHttpHeader(hdr Headers) http.Header {
+	header := http.Header{}
+	for _, hdrValues := range hdr {
+		header.Add(hdrValues[0], hdrValues[1])
+	}
+	return header
 }
