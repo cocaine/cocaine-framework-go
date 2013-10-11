@@ -191,10 +191,10 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 						go func() {
 							defer func() {
 								if r := recover(); r != nil {
-									msg := fmt.Sprintf("Error in event: '%s', exception: %s", msg.Event, r)
+									errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", msg.Event, r)
 									worker.logger.Err(fmt.Sprintf("%s \n Stacktrace: \n %s",
-										msg, string(debug.Stack())))
-									resp.ErrorMsg(1, msg)
+										errMsg, string(debug.Stack())))
+									resp.ErrorMsg(1, errMsg)
 									resp.Close()
 								}
 							}()
