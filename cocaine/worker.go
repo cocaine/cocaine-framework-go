@@ -201,7 +201,10 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 							callback(req, resp)
 						}()
 					} else {
-						worker.logger.Info(fmt.Sprintf("There is no event handler for %s", msg.Event))
+						errMsg := fmt.Sprintf("There is no event handler for %s", msg.Event)
+						worker.logger.Info(errMsg)
+						resp.ErrorMsg(-100, errMsg)
+						resp.Close()
 					}
 
 				case *Heartbeat:
