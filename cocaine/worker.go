@@ -19,7 +19,7 @@ var (
 func init() {
 	flag.StringVar(&flag_uuid, "uuid", "", "UUID")
 	flag.StringVar(&flag_endpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&flag_app, "app", "", "Connection path")
+	flag.StringVar(&flag_app, "app", "standalone", "Connection path")
 	flag.StringVar(&flag_locator, "locator", "", "Connection path")
 	flag.Parse()
 }
@@ -58,6 +58,7 @@ func NewRequest() *Request {
 			case incoming := <-request.from_worker:
 				pending = append(pending, incoming)
 			case out <- first:
+				pending[0] = nil
 				pending = pending[1:]
 			case <-request.quit:
 				quit = true
@@ -107,6 +108,7 @@ func NewResponse(session int64, to_worker chan RawMessage) *Response {
 			case incoming := <-response.from_handler:
 				pending = append(pending, incoming)
 			case out <- first:
+				pending[0] = nil
 				pending = pending[1:]
 			case quit = <-response.quit:
 				quit = true

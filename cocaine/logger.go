@@ -37,20 +37,21 @@ func NewLogger() *Logger {
 func (logger *Logger) log(level int64, message string) {
 	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), message}}
 	logger.wr_in <- Pack(&msg)
+	<-logger.r_out
 }
 
 func (logger *Logger) Err(message string) {
-	go logger.log(LOGERROR, message)
+	//logger.log(LOGERROR, message)
 }
 
 func (logger *Logger) Warn(message string) {
-	go logger.log(LOGWARN, message)
+	//logger.log(LOGWARN, message)
 }
 
 func (logger *Logger) Info(message string) {
-	go logger.log(LOGINFO, message)
+	//logger.log(LOGINFO, message)
 }
 
 func (logger *Logger) Debug(message string) {
-	go logger.log(LOGDEBUG, message)
+	//logger.log(LOGDEBUG, message)
 }

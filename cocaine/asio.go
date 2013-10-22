@@ -15,11 +15,12 @@ func Transmite() (In chan RawMessage, Out chan RawMessage) {
 			var first RawMessage
 			if len(pending) > 0 {
 				first = pending[0]
-				
+
 				select {
 				case incoming := <-In:
 					pending = append(pending, incoming)
 				case Out <- first:
+					pending[0] = nil
 					pending = pending[1:]
 				}
 			} else {

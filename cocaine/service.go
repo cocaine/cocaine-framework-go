@@ -1,8 +1,8 @@
 package cocaine
 
 import (
-	"github.com/ugorji/go/codec"
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"log"
 )
 
@@ -23,6 +23,7 @@ func (err *ServiceError) Error() string {
 func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 	In = make(chan ServiceResult)
 	Out = make(chan ServiceResult)
+	finished := false
 	go func() {
 		var pending []ServiceResult
 		for {
@@ -31,10 +32,18 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 			if len(pending) > 0 {
 				first = pending[0]
 				out = Out
+			} else if finished {
+				close(Out)
+				break
 			}
 			select {
-			case incoming := <-In:
-				pending = append(pending, incoming)
+			case incoming, ok := <-In:
+				if ok {
+					pending = append(pending, incoming)
+				} else {
+					finished = true
+					In = nil
+				}
 			case out <- first:
 				pending = pending[1:]
 			}
@@ -64,7 +73,7 @@ func (service *Service) loop() {
 				fmt.Println(err)
 				service.sessions.Get(msg.GetSessionID()) <- ServiceResult{v, nil}
 			case *Choke:
-				service.sessions.Get(msg.GetSessionID()) <- ServiceResult{nil, nil}
+				close(service.sessions.Get(msg.GetSessionID()))
 				service.sessions.Detach(msg.GetSessionID())
 			case *ErrorMsg:
 				fmt.Println("Error")
