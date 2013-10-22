@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ugorji/go/codec"
 	"log"
+	"time"
 )
 
 type ServiceResult struct {
@@ -53,18 +54,34 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 }
 
 type Service struct {
-	host     string
-	port     uint64
-	pipe     *Pipe
-	unpacker *StreamUnpacker
-	wr_in    chan RawMessage
-	r_out    chan RawMessage
 	sessions *Keeper
+	unpacker *StreamUnpacker
+	ResolveResult
+	AsyncIO
+}
+
+func NewService(host string, port uint64, name string) *Service {
+	log.Println("Create ", name)
+	l, _ := NewLocator(host, port)
+	info := <-l.Resolve(name)
+	fmt.Println(info.Endpoint.AsString(), info.API)
+	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
+	if err != nil {
+		log.Fatal(err)
+	}
+	s := Service{
+		sessions:      NewKeeper(),
+		unpacker:      NewStreamUnpacker(),
+		ResolveResult: info,
+		AsyncIO:       sock,
+	}
+	go s.loop()
+	return &s
 }
 
 func (service *Service) loop() {
-	for {
-		for _, item := range service.unpacker.Feed(<-service.r_out) {
+	for data := range service.AsyncIO.Read() {
+		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
 			case *Chunk:
 				//fmt.Println("Chunk", msg.GetSessionID(), msg.Data)
@@ -83,29 +100,10 @@ func (service *Service) loop() {
 	}
 }
 
-func NewService(host string, port uint64, name string) *Service {
-	log.Println("Create ", name)
-	l := NewLocator(host, port)
-	info := <-l.Resolve(name)
-	wr_in, wr_out := Transmite()
-	r_in, r_out := Transmite()
-	fmt.Println(info.Endpoint.AsString())
-	pipe := NewPipe("tcp", info.Endpoint.AsString(), &wr_out, &r_in)
-	s := Service{host: info.Endpoint.Host,
-		port:     info.Endpoint.Port,
-		pipe:     pipe,
-		unpacker: NewStreamUnpacker(),
-		wr_in:    wr_in,
-		r_out:    r_out,
-		sessions: NewKeeper()}
-	go s.loop()
-	return &s
-}
-
 func (service *Service) Call(method int64, args ...interface{}) chan ServiceResult {
 	in, out := GetServiceChanPair()
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{MessageInfo{method, id}, args}
-	service.wr_in <- Pack(&msg)
+	service.AsyncIO.Write() <- Pack(&msg)
 	return out
 }

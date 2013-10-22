@@ -1,10 +1,11 @@
 package cocaine
 
 import (
-	"github.com/ugorji/go/codec"
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"log"
 	"reflect"
+	"time"
 )
 
 type Endpoint struct {
@@ -23,20 +24,21 @@ type ResolveResult struct {
 	API     map[int]string
 }
 
+//NewLocator
+
 type Locator struct {
 	host     string
 	port     uint64
-	pipe     *Pipe
 	unpacker *StreamUnpacker
-	wr_in    chan RawMessage
-	r_out    chan RawMessage
+	AsyncIO
 }
 
-func NewLocator(host string, port uint64) *Locator {
-	wr_in, wr_out := Transmite()
-	r_in, r_out := Transmite()
-	pipe := NewPipe("tcp", fmt.Sprintf("%s:%d", host, port), &wr_out, &r_in)
-	return &Locator{host, port, pipe, NewStreamUnpacker(), wr_in, r_out}
+func NewLocator(host string, port uint64) (*Locator, error) {
+	sock, err := NewASocket("tcp", fmt.Sprintf("%s:%d", host, port), time.Second*5)
+	if err != nil {
+		return nil, err
+	}
+	return &Locator{host, port, NewStreamUnpacker(), sock}, nil
 }
 
 func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
@@ -70,10 +72,10 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		resolveresult.success = false
 		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
 		raw := Pack(&msg)
-		locator.wr_in <- raw
+		locator.AsyncIO.Write() <- raw
 		closed := false
 		for !closed {
-			answer := <-locator.r_out
+			answer := <-locator.AsyncIO.Read()
 			msgs := locator.unpacker.Feed(answer) //DecodeRaw(answer, &left)
 			for _, item := range msgs {
 				switch id := item.GetTypeID(); id {
@@ -88,4 +90,8 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		Out <- resolveresult
 	}()
 	return Out
+}
+
+func (locator *Locator) Close() {
+	locator.AsyncIO.Close()
 }

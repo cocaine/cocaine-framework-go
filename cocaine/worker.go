@@ -175,16 +175,16 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			for _, rawmsg := range msgs {
 				switch msg := rawmsg.(type) {
 				case *Chunk:
-					worker.logger.Err("Receive chunk")
+					worker.logger.Debug("Receive chunk")
 					worker.sessions[msg.GetSessionID()].push(msg.Data)
 
 				case *Choke:
-					worker.logger.Info("Receive choke")
+					worker.logger.Debug("Receive choke")
 					worker.sessions[msg.GetSessionID()].close()
 					delete(worker.sessions, msg.GetSessionID())
 
 				case *Invoke:
-					worker.logger.Info(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.GetSessionID()))
+					worker.logger.Debug(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.GetSessionID()))
 					cur_session := msg.GetSessionID()
 					req := NewRequest()
 					resp := NewResponse(cur_session, worker.from_handlers)
@@ -204,29 +204,29 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 						}()
 					} else {
 						errMsg := fmt.Sprintf("There is no event handler for %s", msg.Event)
-						worker.logger.Info(errMsg)
+						worker.logger.Debug(errMsg)
 						resp.ErrorMsg(-100, errMsg)
 						resp.Close()
 					}
 
 				case *Heartbeat:
-					worker.logger.Info("Receive heartbeat. Stop disown_timer")
+					worker.logger.Debug("Receive heartbeat. Stop disown_timer")
 					worker.disown_timer.Stop()
 
 				case *Terminate:
-					worker.logger.Info("Receive terminate")
+					worker.logger.Debug("Receive terminate")
 					os.Exit(0)
 
 				default:
-					worker.logger.Info("Unknown message")
+					worker.logger.Debug("Unknown message")
 				}
 			}
 		case <-worker.heartbeat_timer.C:
-			worker.logger.Info("Send heartbeat")
+			worker.logger.Debug("Send heartbeat")
 			worker.heartbeat()
 
 		case <-worker.disown_timer.C:
-			worker.logger.Err("Disowned")
+			worker.logger.Debug("Disowned")
 
 		case outcoming := <-worker.from_handlers:
 			worker.wr_in <- outcoming
