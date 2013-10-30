@@ -41,10 +41,14 @@ func app_list(request *cocaine.Request, response *cocaine.Response) {
 }
 
 func http_test(request *cocaine.Request, response *cocaine.Response) {
-	req := cocaine.UnpackProxyRequest(<-request.Read())
-	response.Write(cocaine.WriteHead(200, [][2]string{{"Content-Type", "text/html"}}))
-	ans := fmt.Sprintf("Method: %s, Uri: %s, UA: %s", req.Method, req.URL, req.UserAgent())
-	response.Write(ans)
+	req, err := cocaine.UnpackProxyRequest(<-request.Read())
+	if err != nil {
+		response.Write(cocaine.WriteHead(200, [][2]string{{"Content-Type", "text/html"}}))
+		ans := fmt.Sprintf("Method: %s, Uri: %s, UA: %s", req.Method, req.URL, req.UserAgent())
+		response.Write(ans)
+	} else {
+		logger.Err("Could not unpack request to http request")
+	}
 	response.Close()
 }
 
