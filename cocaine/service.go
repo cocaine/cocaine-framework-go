@@ -1,17 +1,31 @@
 package cocaine
 
 import (
-	"fmt"
 	"github.com/ugorji/go/codec"
 	"log"
 	"time"
 )
 
-type ServiceResult struct {
-	Res interface{}
-	Err error
+type ServiceResult interface {
+	Extract(interface{}) error
+	Err() error
 }
 
+type ServiceRes struct {
+	res []byte
+	err error
+}
+
+func (s *ServiceRes) Extract(target interface{}) (err error) {
+	err = codec.NewDecoderBytes(s.res, h).Decode(&target)
+	return
+}
+
+func (s *ServiceRes) Err() error {
+	return s.err
+}
+
+//
 type ServiceError struct {
 	Code    int
 	Message string
@@ -53,16 +67,11 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 	return
 }
 
-type ServiceIntefrace interface {
-	Call(int64, ...interface{}) chan ServiceResult
-	Close()
-}
-
 type Service struct {
 	sessions *Keeper
 	unpacker *StreamUnpacker
 	ResolveResult
-	SocketIO
+	socketIO
 }
 
 func NewService(name string, args ...interface{}) *Service {
@@ -81,28 +90,23 @@ func NewService(name string, args ...interface{}) *Service {
 		sessions:      NewKeeper(),
 		unpacker:      NewStreamUnpacker(),
 		ResolveResult: info,
-		SocketIO:      sock,
+		socketIO:      sock,
 	}
 	go s.loop()
 	return &s
 }
 
 func (service *Service) loop() {
-	for data := range service.SocketIO.Read() {
+	for data := range service.socketIO.Read() {
 		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
 			case *Chunk:
-				//fmt.Println("Chunk", msg.GetSessionID(), msg.Data)
-				var v interface{}
-				err := codec.NewDecoderBytes(msg.Data, h).Decode(&v)
-				fmt.Println(err)
-				service.sessions.Get(msg.GetSessionID()) <- ServiceResult{v, nil}
+				service.sessions.Get(msg.GetSessionID()) <- &ServiceRes{msg.Data, nil}
 			case *Choke:
 				close(service.sessions.Get(msg.GetSessionID()))
 				service.sessions.Detach(msg.GetSessionID())
 			case *ErrorMsg:
-				fmt.Println("Error")
-				service.sessions.Get(msg.GetSessionID()) <- ServiceResult{nil, &ServiceError{msg.Code, msg.Message}}
+				service.sessions.Get(msg.GetSessionID()) <- &ServiceRes{nil, &ServiceError{msg.Code, msg.Message}}
 			}
 		}
 	}
@@ -112,10 +116,10 @@ func (service *Service) Call(method int64, args ...interface{}) chan ServiceResu
 	in, out := GetServiceChanPair()
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{MessageInfo{method, id}, args}
-	service.SocketIO.Write() <- Pack(&msg)
+	service.socketIO.Write() <- Pack(&msg)
 	return out
 }
 
 func (service *Service) Close() {
-	service.SocketIO.Close()
+	service.socketIO.Close()
 }

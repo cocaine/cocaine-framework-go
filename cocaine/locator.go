@@ -28,7 +28,7 @@ type ResolveResult struct {
 
 type Locator struct {
 	unpacker *StreamUnpacker
-	SocketIO
+	socketIO
 }
 
 func NewLocator(args ...interface{}) (*Locator, error) {
@@ -68,10 +68,10 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		resolveresult.success = false
 		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
 		raw := Pack(&msg)
-		locator.SocketIO.Write() <- raw
+		locator.socketIO.Write() <- raw
 		closed := false
 		for !closed {
-			answer := <-locator.SocketIO.Read()
+			answer := <-locator.socketIO.Read()
 			msgs := locator.unpacker.Feed(answer)
 			for _, item := range msgs {
 				switch id := item.GetTypeID(); id {
@@ -89,5 +89,5 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 }
 
 func (locator *Locator) Close() {
-	locator.SocketIO.Close()
+	locator.socketIO.Close()
 }

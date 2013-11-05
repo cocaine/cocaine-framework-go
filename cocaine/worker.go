@@ -144,7 +144,7 @@ type Worker struct {
 	disown_timer    *time.Timer
 	sessions        map[int64](*Request)
 	from_handlers   chan RawMessage
-	SocketIO
+	socketIO
 }
 
 func NewWorker() *Worker {
@@ -160,7 +160,7 @@ func NewWorker() *Worker {
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
 		sessions:        make(map[int64](*Request)),
 		from_handlers:   make(chan RawMessage),
-		SocketIO:        sock,
+		socketIO:        sock,
 	}
 	w.disown_timer.Stop()
 	w.handshake()

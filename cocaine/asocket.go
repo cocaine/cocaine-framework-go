@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type SocketIO interface {
+type socketIO interface {
 	Read() chan RawMessage
 	Write() chan RawMessage
 	Close()
