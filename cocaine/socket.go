@@ -62,8 +62,8 @@ func (bf *AsyncBuff) Stop() (res bool) {
 	select {
 	case bf.stop <- true:
 		res = true
-		// default:
-		// 	res = false
+	default:
+		res = false
 	}
 	return
 }

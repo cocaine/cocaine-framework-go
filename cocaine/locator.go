@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const DEFAULT_LOCATOR_PORT = 10053
+
 type Endpoint struct {
 	Host string
 	Port uint64
@@ -27,18 +29,24 @@ type ResolveResult struct {
 //NewLocator
 
 type Locator struct {
-	host     string
-	port     uint64
 	unpacker *StreamUnpacker
 	AsyncIO
 }
 
-func NewLocator(host string, port uint64) (*Locator, error) {
-	sock, err := NewASocket("tcp", fmt.Sprintf("%s:%d", host, port), time.Second*5)
+func NewLocator(args ...interface{}) (*Locator, error) {
+
+	var endpoint string = "localhost:10053"
+	if len(args) == 1 {
+		if _endpoint, ok := args[0].(string); ok {
+			endpoint = _endpoint
+		}
+	}
+
+	sock, err := NewASocket("tcp", endpoint, time.Second*5)
 	if err != nil {
 		return nil, err
 	}
-	return &Locator{host, port, NewStreamUnpacker(), sock}, nil
+	return &Locator{NewStreamUnpacker(), sock}, nil
 }
 
 func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {

@@ -53,6 +53,11 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 	return
 }
 
+type ServiceIntefrace interface {
+	Call(int64, ...interface{}) chan ServiceResult
+	Close()
+}
+
 type Service struct {
 	sessions *Keeper
 	unpacker *StreamUnpacker
@@ -60,9 +65,8 @@ type Service struct {
 	AsyncIO
 }
 
-func NewService(host string, port uint64, name string) *Service {
-	log.Println("Create ", name)
-	l, err := NewLocator(host, port)
+func NewService(name string, args ...interface{}) *Service {
+	l, err := NewLocator(args...)
 	if err != nil {
 		log.Println(err)
 		return nil

@@ -14,8 +14,8 @@ const (
 	APPLICATION_INFO
 )
 
-func NewApplication(name string, host string, port uint64) (*Application, error) {
-	return &Application{NewService(host, port, name)}, nil
+func NewApplication(name string, args ...interface{}) (*Application, error) {
+	return &Application{NewService(name, args...)}, nil
 }
 
 func (app *Application) Enqueue(event string, data []byte) chan ServiceResult {
