@@ -1,29 +1,28 @@
 package cocaine
 
 import (
-	"log"
 	"net"
 	"time"
 )
 
-type AsyncIO interface {
+type SocketIO interface {
 	Read() chan RawMessage
 	Write() chan RawMessage
 	Close()
 }
 
-type AsyncBuff struct {
+type asyncBuff struct {
 	in, out chan RawMessage
 	stop    chan bool
 }
 
-func NewAsyncBuf() *AsyncBuff {
-	buf := AsyncBuff{make(chan RawMessage), make(chan RawMessage), make(chan bool, 1)}
+func newAsyncBuf() *asyncBuff {
+	buf := asyncBuff{make(chan RawMessage), make(chan RawMessage), make(chan bool, 1)}
 	buf.loop()
 	return &buf
 }
 
-func (bf *AsyncBuff) loop() {
+func (bf *asyncBuff) loop() {
 	go func() {
 		var pending []RawMessage // data buffer
 		var _in chan RawMessage  // incoming channel
@@ -58,7 +57,7 @@ func (bf *AsyncBuff) loop() {
 	}()
 }
 
-func (bf *AsyncBuff) Stop() (res bool) {
+func (bf *asyncBuff) Stop() (res bool) {
 	select {
 	case bf.stop <- true:
 		res = true
@@ -70,8 +69,8 @@ func (bf *AsyncBuff) Stop() (res bool) {
 
 type ASocket struct {
 	net.Conn
-	clientToSock   *AsyncBuff
-	socketToClient *AsyncBuff
+	clientToSock   *asyncBuff
+	socketToClient *asyncBuff
 }
 
 func NewASocket(family string, address string, timeout time.Duration) (*ASocket, error) {
@@ -80,16 +79,16 @@ func NewASocket(family string, address string, timeout time.Duration) (*ASocket,
 		return nil, err
 	}
 
-	sock := ASocket{conn, NewAsyncBuf(), NewAsyncBuf()}
+	sock := ASocket{conn, newAsyncBuf(), newAsyncBuf()}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
 }
 
 func (sock *ASocket) Close() {
-	log.Println(sock.Conn.Close())
-	log.Println(sock.clientToSock.Stop())
-	log.Println(sock.socketToClient.Stop())
+	sock.Conn.Close()
+	sock.clientToSock.Stop()
+	sock.socketToClient.Stop()
 }
 
 func (sock *ASocket) Write() chan RawMessage {

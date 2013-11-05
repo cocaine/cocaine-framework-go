@@ -3,10 +3,12 @@ package cocaine
 import (
 	"flag"
 	"fmt"
-	"github.com/ugorji/go/codec"
+	"log"
 	"os"
 	"runtime/debug"
 	"time"
+
+	"github.com/ugorji/go/codec"
 )
 
 var (
@@ -135,32 +137,31 @@ func (response *Response) ErrorMsg(code int, msg string) {
 
 //Worker
 type Worker struct {
-	pipe            *Pipe
 	unpacker        *StreamUnpacker
 	uuid            string
-	wr_in           chan RawMessage
-	r_out           chan RawMessage
 	logger          *Logger
 	heartbeat_timer *time.Timer
 	disown_timer    *time.Timer
 	sessions        map[int64](*Request)
 	from_handlers   chan RawMessage
+	SocketIO
 }
 
 func NewWorker() *Worker {
-	wr_in, wr_out := Transmite() // Write to buffer: wr_in <-
-	r_in, r_out := Transmite()   // Read from buffer: <- r_out
-	pipe := NewPipe("unix", flag_endpoint, &wr_out, &r_in)
-	w := Worker{pipe: pipe,
+	sock, err := NewASocket("unix", flag_endpoint, time.Second*5)
+	if err != nil {
+		log.Fatal(err)
+	}
+	w := Worker{
 		unpacker:        NewStreamUnpacker(),
 		uuid:            flag_uuid,
-		wr_in:           wr_in,
-		r_out:           r_out,
 		logger:          NewLogger(),
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
 		sessions:        make(map[int64](*Request)),
-		from_handlers:   make(chan RawMessage)}
+		from_handlers:   make(chan RawMessage),
+		SocketIO:        sock,
+	}
 	w.disown_timer.Stop()
 	w.handshake()
 	w.heartbeat()
@@ -170,7 +171,7 @@ func NewWorker() *Worker {
 func (worker *Worker) Loop(bind map[string]EventHandler) {
 	for {
 		select {
-		case answer := <-worker.r_out:
+		case answer := <-worker.Read():
 			msgs := worker.unpacker.Feed(answer)
 			for _, rawmsg := range msgs {
 				switch msg := rawmsg.(type) {
@@ -229,19 +230,19 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			worker.logger.Debug("Disowned")
 
 		case outcoming := <-worker.from_handlers:
-			worker.wr_in <- outcoming
+			worker.Write() <- outcoming
 		}
 	}
 }
 
 func (worker *Worker) heartbeat() {
 	heartbeat := Heartbeat{MessageInfo{HEARTBEAT, 0}}
-	worker.wr_in <- Pack(&heartbeat)
+	worker.Write() <- Pack(&heartbeat)
 	worker.disown_timer.Reset(DISOWN_TIMEOUT)
 	worker.heartbeat_timer.Reset(HEARTBEAT_TIMEOUT)
 }
 
 func (worker *Worker) handshake() {
 	handshake := Handshake{MessageInfo{HANDSHAKE, 0}, worker.uuid}
-	worker.wr_in <- Pack(&handshake)
+	worker.Write() <- Pack(&handshake)
 }

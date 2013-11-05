@@ -8,7 +8,6 @@ type Application struct {
 	*Service
 }
 
-//map[0:enqueue 1:info]
 const (
 	APPLICATION_ENQUEUE = iota
 	APPLICATION_INFO

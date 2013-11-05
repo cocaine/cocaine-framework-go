@@ -1,14 +1,13 @@
 package main
 
 import (
-	"github.com/cocaine/cocaine-framework-go/cocaine"
 	"fmt"
-	"strings"
+	"github.com/cocaine/cocaine-framework-go/cocaine"
 )
 
 var (
-	logger  *cocaine.Logger
-	storage *cocaine.Storage
+	logger *cocaine.Logger
+	//storage *cocaine.Storage
 )
 
 func dummy(request *cocaine.Request, response *cocaine.Response) {
@@ -30,14 +29,14 @@ func echo(request *cocaine.Request, response *cocaine.Response) {
 
 func app_list(request *cocaine.Request, response *cocaine.Response) {
 	<-request.Read()
-	if list := <-storage.Find("apps", []string{"app"}); list.Err != nil {
-		logger.Err(fmt.Sprintf("Unable to fetch  list%s", list.Err))
-		response.Write("fail")
-		response.Close()
-	} else {
-		response.Write(strings.Join(list.Res, ","))
-		response.Close()
-	}
+	// if list := <-storage.Find("apps", []string{"app"}); list.Err != nil {
+	// 	logger.Err(fmt.Sprintf("Unable to fetch  list%s", list.Err))
+	// 	response.Write("fail")
+	// 	response.Close()
+	// } else {
+	// 	response.Write(strings.Join(list.Res, ","))
+	// 	response.Close()
+	// }
 }
 
 func http_test(request *cocaine.Request, response *cocaine.Response) {
@@ -54,7 +53,7 @@ func http_test(request *cocaine.Request, response *cocaine.Response) {
 
 func main() {
 	logger = cocaine.NewLogger()
-	storage, _ = cocaine.NewStorage("localhost", 10053)
+	//storage, _ = cocaine.NewStorage("localhost", 10053)
 	binds := map[string]cocaine.EventHandler{
 		"testevent": dummy,
 		"echo":      echo,

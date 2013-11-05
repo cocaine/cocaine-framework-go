@@ -8,9 +8,7 @@ import (
 )
 
 type Logger struct {
-	host string
-	port uint64
-	AsyncIO
+	SocketIO
 	stop      chan bool
 	verbosity int
 }
@@ -37,14 +35,15 @@ func NewLogger() *Logger {
 	}
 
 	//Create logger
-	logger := Logger{info.Endpoint.Host, info.Endpoint.Port, sock, make(chan bool), 0}
+	logger := Logger{
+		sock, make(chan bool), 0}
 
 	//Get verbosity
 	msg := ServiceMethod{MessageInfo{1, 0}, []interface{}{}}
-	logger.AsyncIO.Write() <- Pack(&msg)
+	logger.SocketIO.Write() <- Pack(&msg)
 	u := NewStreamUnpacker()
 	for {
-		for _, item := range u.Feed(<-logger.AsyncIO.Read()) {
+		for _, item := range u.Feed(<-logger.SocketIO.Read()) {
 			switch msg := item.(type) {
 			case *Chunk:
 				codec.NewDecoderBytes(msg.Data, h).Decode(&logger.verbosity)
@@ -58,8 +57,8 @@ func NewLogger() *Logger {
 // Blocked
 func (logger *Logger) log(level int64, message string) bool {
 	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), message}}
-	logger.AsyncIO.Write() <- Pack(&msg)
-	<-logger.AsyncIO.Read() // Blocked
+	logger.SocketIO.Write() <- Pack(&msg)
+	<-logger.SocketIO.Read() // Blocked
 
 	return true
 }
@@ -81,7 +80,7 @@ func (logger *Logger) Debug(message string) {
 }
 
 func (logger *Logger) Close() {
-	logger.AsyncIO.Close()
+	logger.SocketIO.Close()
 	select {
 	case logger.stop <- true:
 	default:

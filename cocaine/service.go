@@ -62,7 +62,7 @@ type Service struct {
 	sessions *Keeper
 	unpacker *StreamUnpacker
 	ResolveResult
-	AsyncIO
+	SocketIO
 }
 
 func NewService(name string, args ...interface{}) *Service {
@@ -73,7 +73,6 @@ func NewService(name string, args ...interface{}) *Service {
 	}
 	defer l.Close()
 	info := <-l.Resolve(name)
-	fmt.Println(info.Endpoint.AsString(), info.API)
 	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
 	if err != nil {
 		log.Fatal(err)
@@ -82,14 +81,14 @@ func NewService(name string, args ...interface{}) *Service {
 		sessions:      NewKeeper(),
 		unpacker:      NewStreamUnpacker(),
 		ResolveResult: info,
-		AsyncIO:       sock,
+		SocketIO:      sock,
 	}
 	go s.loop()
 	return &s
 }
 
 func (service *Service) loop() {
-	for data := range service.AsyncIO.Read() {
+	for data := range service.SocketIO.Read() {
 		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
 			case *Chunk:
@@ -113,10 +112,10 @@ func (service *Service) Call(method int64, args ...interface{}) chan ServiceResu
 	in, out := GetServiceChanPair()
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{MessageInfo{method, id}, args}
-	service.AsyncIO.Write() <- Pack(&msg)
+	service.SocketIO.Write() <- Pack(&msg)
 	return out
 }
 
 func (service *Service) Close() {
-	service.AsyncIO.Close()
+	service.SocketIO.Close()
 }
