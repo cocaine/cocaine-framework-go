@@ -35,7 +35,7 @@ func (err *ServiceError) Error() string {
 	return err.Message
 }
 
-func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
+func GetServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan ServiceResult) {
 	In = make(chan ServiceResult)
 	Out = make(chan ServiceResult)
 	finished := false
@@ -44,6 +44,7 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 		for {
 			var out chan ServiceResult
 			var first ServiceResult
+
 			if len(pending) > 0 {
 				first = pending[0]
 				out = Out
@@ -51,6 +52,7 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 				close(Out)
 				break
 			}
+
 			select {
 			case incoming, ok := <-In:
 				if ok {
@@ -59,8 +61,12 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 					finished = true
 					In = nil
 				}
+
 			case out <- first:
 				pending = pending[1:]
+
+			case <-stop: // Notification from Close()
+				return
 			}
 		}
 	}()
@@ -70,6 +76,7 @@ func GetServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
 type Service struct {
 	sessions *Keeper
 	unpacker *StreamUnpacker
+	stop     chan bool
 	ResolveResult
 	socketIO
 }
@@ -113,7 +120,7 @@ func (service *Service) loop() {
 }
 
 func (service *Service) Call(method int64, args ...interface{}) chan ServiceResult {
-	in, out := GetServiceChanPair()
+	in, out := GetServiceChanPair(service.stop)
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{MessageInfo{method, id}, args}
 	service.socketIO.Write() <- Pack(&msg)
@@ -121,5 +128,6 @@ func (service *Service) Call(method int64, args ...interface{}) chan ServiceResu
 }
 
 func (service *Service) Close() {
+	close(service.stop) // Broadcast all related goroutines about disposing
 	service.socketIO.Close()
 }
