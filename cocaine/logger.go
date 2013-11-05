@@ -25,6 +25,7 @@ const (
 
 func NewLogger() *Logger {
 	l, _ := NewLocator("localhost", 10053)
+	defer l.Close()
 	info := <-l.Resolve("logging")
 	if info.success == false {
 		fmt.Printf("Unable to create logger, could not resolve logging service. Stack trace: \n %s", string(debug.Stack()))

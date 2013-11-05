@@ -62,7 +62,12 @@ type Service struct {
 
 func NewService(host string, port uint64, name string) *Service {
 	log.Println("Create ", name)
-	l, _ := NewLocator(host, port)
+	l, err := NewLocator(host, port)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer l.Close()
 	info := <-l.Resolve(name)
 	fmt.Println(info.Endpoint.AsString(), info.API)
 	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
@@ -106,4 +111,8 @@ func (service *Service) Call(method int64, args ...interface{}) chan ServiceResu
 	msg := ServiceMethod{MessageInfo{method, id}, args}
 	service.AsyncIO.Write() <- Pack(&msg)
 	return out
+}
+
+func (service *Service) Close() {
+	service.AsyncIO.Close()
 }

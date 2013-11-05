@@ -1,6 +1,7 @@
 package cocaine
 
 import (
+	"log"
 	"net"
 	"time"
 )
@@ -17,7 +18,7 @@ type AsyncBuff struct {
 }
 
 func NewAsyncBuf() *AsyncBuff {
-	buf := AsyncBuff{make(chan RawMessage), make(chan RawMessage), make(chan bool)}
+	buf := AsyncBuff{make(chan RawMessage), make(chan RawMessage), make(chan bool, 1)}
 	buf.loop()
 	return &buf
 }
@@ -61,8 +62,8 @@ func (bf *AsyncBuff) Stop() (res bool) {
 	select {
 	case bf.stop <- true:
 		res = true
-	default:
-		res = false
+		// default:
+		// 	res = false
 	}
 	return
 }
@@ -86,9 +87,9 @@ func NewASocket(family string, address string, timeout time.Duration) (*ASocket,
 }
 
 func (sock *ASocket) Close() {
-	sock.Conn.Close()
-	sock.clientToSock.Stop()
-	sock.socketToClient.Stop()
+	log.Println(sock.Conn.Close())
+	log.Println(sock.clientToSock.Stop())
+	log.Println(sock.socketToClient.Stop())
 }
 
 func (sock *ASocket) Write() chan RawMessage {
