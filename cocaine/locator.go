@@ -1,6 +1,7 @@
 package cocaine
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -23,7 +24,18 @@ type ResolveResult struct {
 	success  bool
 	Endpoint `codec:",omitempty"`
 	Version  int
-	API      map[int]string
+	API      map[int64]string
+}
+
+func (r *ResolveResult) getMethodNumber(name string) (number int64, err error) {
+	for key, value := range r.API {
+		if value == name {
+			number = key
+			return
+		}
+	}
+	err = errors.New("Missing method")
+	return
 }
 
 type Locator struct {
@@ -48,11 +60,11 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 }
 
 func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println("defer", err)
-		}
-	}()
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		log.Println("defer", err)
+	// 	}
+	// }()
 	var res ResolveResult
 	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
 	if err != nil {
@@ -67,8 +79,7 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		var resolveresult ResolveResult
 		resolveresult.success = false
 		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
-		raw := Pack(&msg)
-		locator.socketIO.Write() <- raw
+		locator.socketIO.Write() <- Pack(&msg)
 		closed := false
 		for !closed {
 			answer := <-locator.socketIO.Read()

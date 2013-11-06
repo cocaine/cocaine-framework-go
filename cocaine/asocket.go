@@ -9,6 +9,7 @@ type socketIO interface {
 	Read() chan RawMessage
 	Write() chan RawMessage
 	Close()
+	IsBroken() <-chan bool
 }
 
 type asyncBuff struct {
@@ -69,6 +70,7 @@ func (bf *asyncBuff) Stop() (res bool) {
 
 type ASocket struct {
 	net.Conn
+	state          chan bool
 	clientToSock   *asyncBuff
 	socketToClient *asyncBuff
 }
@@ -79,7 +81,7 @@ func NewASocket(family string, address string, timeout time.Duration) (*ASocket,
 		return nil, err
 	}
 
-	sock := ASocket{conn, newAsyncBuf(), newAsyncBuf()}
+	sock := ASocket{conn, make(chan bool), newAsyncBuf(), newAsyncBuf()}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
@@ -91,12 +93,20 @@ func (sock *ASocket) Close() {
 	sock.socketToClient.Stop()
 }
 
+func (sock *ASocket) IsBroken() <-chan bool {
+	return sock.state
+}
+
 func (sock *ASocket) Write() chan RawMessage {
 	return sock.clientToSock.in
 }
 
 func (sock *ASocket) Read() chan RawMessage {
 	return sock.socketToClient.out
+}
+
+func (sock *ASocket) setDisconnected() {
+
 }
 
 func (sock *ASocket) writeloop() {

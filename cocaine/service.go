@@ -119,7 +119,13 @@ func (service *Service) loop() {
 	}
 }
 
-func (service *Service) Call(method int64, args ...interface{}) chan ServiceResult {
+func (service *Service) Call(name string, args ...interface{}) chan ServiceResult {
+	method, err := service.getMethodNumber(name)
+	if err != nil {
+		errorOut := make(chan ServiceResult, 1)
+		errorOut <- &ServiceRes{nil, &ServiceError{-100, "Wrong method name"}}
+		return errorOut
+	}
 	in, out := GetServiceChanPair(service.stop)
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{MessageInfo{method, id}, args}
