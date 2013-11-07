@@ -55,28 +55,28 @@ func NewLogger() *Logger {
 }
 
 // Blocked
-func (logger *Logger) log(level int64, message string) bool {
-	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), message}}
+func (logger *Logger) log(level int64, message ...interface{}) bool {
+	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
 	logger.socketIO.Write() <- Pack(&msg)
 	<-logger.socketIO.Read() // Blocked
 
 	return true
 }
 
-func (logger *Logger) Err(message string) {
-	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, message)
+func (logger *Logger) Err(message ...interface{}) {
+	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, message...)
 }
 
-func (logger *Logger) Warn(message string) {
-	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, message)
+func (logger *Logger) Warn(message ...interface{}) {
+	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, message...)
 }
 
-func (logger *Logger) Info(message string) {
-	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, message)
+func (logger *Logger) Info(message ...interface{}) {
+	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, message...)
 }
 
-func (logger *Logger) Debug(message string) {
-	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, message)
+func (logger *Logger) Debug(message ...interface{}) {
+	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, message...)
 }
 
 func (logger *Logger) Close() {

@@ -96,6 +96,7 @@ func NewService(name string, args ...interface{}) *Service {
 	s := Service{
 		sessions:      NewKeeper(),
 		unpacker:      NewStreamUnpacker(),
+		stop:          make(chan bool),
 		ResolveResult: info,
 		socketIO:      sock,
 	}
