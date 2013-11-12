@@ -2,10 +2,9 @@ package cocaine
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
 	"fmt"
-	"io"
-	"log"
+
+	"github.com/ugorji/go/codec"
 )
 
 const (
@@ -204,7 +203,7 @@ func UnpackMessage(input []interface{}) Message {
 	case int64:
 		session = input[1].(int64)
 	}
-	
+
 	data := input[2].([]interface{})
 
 	switch input[0].(int64) {
@@ -240,9 +239,6 @@ func (unpacker *StreamUnpacker) Feed(data []byte) []Message {
 		var res []interface{}
 		err := dec.Decode(&res)
 		if err != nil {
-			if err != io.EOF {
-				log.Println(err)
-			}
 			break
 		} else {
 			msgs = append(msgs, UnpackMessage(res))
