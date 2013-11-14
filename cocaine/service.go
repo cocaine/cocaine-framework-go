@@ -81,19 +81,19 @@ type Service struct {
 	socketIO
 }
 
-func NewService(name string, args ...interface{}) *Service {
+func NewService(name string, args ...interface{}) (s *Service, err error) {
 	l, err := NewLocator(args...)
 	if err != nil {
 		log.Println(err)
-		return nil
+		return
 	}
 	defer l.Close()
 	info := <-l.Resolve(name)
 	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	s := Service{
+	s = &Service{
 		sessions:      NewKeeper(),
 		unpacker:      NewStreamUnpacker(),
 		stop:          make(chan bool),
@@ -101,7 +101,7 @@ func NewService(name string, args ...interface{}) *Service {
 		socketIO:      sock,
 	}
 	go s.loop()
-	return &s
+	return
 }
 
 func (service *Service) loop() {
