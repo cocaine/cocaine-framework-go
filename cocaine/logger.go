@@ -1,15 +1,13 @@
 package cocaine
 
 import (
+	"errors"
 	"fmt"
-	"github.com/ugorji/go/codec"
-	"runtime/debug"
 	"time"
 )
 
 type Logger struct {
-	socketIO
-	stop      chan bool
+	socketWriter
 	verbosity int
 }
 
@@ -21,45 +19,37 @@ const (
 	LOGDEBUG
 )
 
-func NewLogger() *Logger {
-	l, _ := NewLocator("localhost", 10053)
-	defer l.Close()
-	info := <-l.Resolve("logging")
-	if info.success == false {
-		fmt.Printf("Unable to create logger, could not resolve logging service. Stack trace: \n %s", string(debug.Stack()))
-		return nil
-	}
-	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
+func NewLogger() (logger *Logger, err error) {
+	temp, err := NewService("logging", "localhost", 10053)
 	if err != nil {
-		return nil
+		return
+	}
+	defer temp.Close()
+
+	res := <-temp.Call("verbosity")
+	if res.Err() != nil {
+		err = errors.New("Unable to receive verbosity")
+		return
+	}
+	var verbosity int = 0
+	if err = res.Extract(&verbosity); err != nil {
+		return
+	}
+
+	sock, err := NewWSocket("tcp", temp.ResolveResult.AsString(), time.Second*5)
+	if err != nil {
+		return
 	}
 
 	//Create logger
-	logger := Logger{
-		sock, make(chan bool), 0}
-
-	//Get verbosity
-	msg := ServiceMethod{MessageInfo{1, 0}, []interface{}{}}
-	logger.socketIO.Write() <- Pack(&msg)
-	u := NewStreamUnpacker()
-	for {
-		for _, item := range u.Feed(<-logger.socketIO.Read()) {
-			switch msg := item.(type) {
-			case *Chunk:
-				codec.NewDecoderBytes(msg.Data, h).Decode(&logger.verbosity)
-			case *Choke:
-				return &logger
-			}
-		}
-	}
+	logger = &Logger{sock, verbosity}
+	return
 }
 
 // Blocked
 func (logger *Logger) log(level int64, message ...interface{}) bool {
 	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
-	logger.socketIO.Write() <- Pack(&msg)
-	<-logger.socketIO.Read() // Blocked
-
+	logger.Write() <- Pack(&msg)
 	return true
 }
 
@@ -80,10 +70,5 @@ func (logger *Logger) Debug(message ...interface{}) {
 }
 
 func (logger *Logger) Close() {
-	logger.socketIO.Close()
-	select {
-	case logger.stop <- true:
-	default:
-		return
-	}
+	logger.socketWriter.Close()
 }

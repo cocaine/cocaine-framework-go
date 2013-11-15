@@ -9,7 +9,11 @@ type socketIO interface {
 	Read() chan RawMessage
 	Write() chan RawMessage
 	Close()
-	IsBroken() <-chan bool
+}
+
+type socketWriter interface {
+	Write() chan RawMessage
+	Close()
 }
 
 type asyncBuff struct {
@@ -59,18 +63,14 @@ func (bf *asyncBuff) loop() {
 }
 
 func (bf *asyncBuff) Stop() (res bool) {
-	select {
-	case bf.stop <- true:
-		res = true
-	default:
-		res = false
-	}
+	close(bf.stop)
 	return
 }
 
+// Biderectional socket
 type ASocket struct {
 	net.Conn
-	state          chan bool
+	closed         chan bool
 	clientToSock   *asyncBuff
 	socketToClient *asyncBuff
 }
@@ -88,13 +88,10 @@ func NewASocket(family string, address string, timeout time.Duration) (*ASocket,
 }
 
 func (sock *ASocket) Close() {
-	sock.Conn.Close()
+	close(sock.closed)
 	sock.clientToSock.Stop()
 	sock.socketToClient.Stop()
-}
-
-func (sock *ASocket) IsBroken() <-chan bool {
-	return sock.state
+	sock.Conn.Close()
 }
 
 func (sock *ASocket) Write() chan RawMessage {
@@ -105,16 +102,12 @@ func (sock *ASocket) Read() chan RawMessage {
 	return sock.socketToClient.out
 }
 
-func (sock *ASocket) setDisconnected() {
-
-}
-
 func (sock *ASocket) writeloop() {
 	go func() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
-				break
+				return
 			}
 		}
 	}()
@@ -127,11 +120,62 @@ func (sock *ASocket) readloop() {
 			count, err := sock.Conn.Read(buf)
 			if err != nil {
 				close(sock.socketToClient.in)
-				break
+				return
 			} else {
 				bufferToSend := make([]byte, count)
 				copy(bufferToSend[:], buf[:count])
 				sock.socketToClient.in <- bufferToSend
+			}
+		}
+	}()
+}
+
+// WriteOnly Socket
+type WSocket struct {
+	net.Conn
+	state        chan bool
+	clientToSock *asyncBuff
+}
+
+func NewWSocket(family string, address string, timeout time.Duration) (*WSocket, error) {
+	conn, err := net.DialTimeout(family, address, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	sock := WSocket{conn, make(chan bool), newAsyncBuf()}
+	sock.readloop()
+	sock.writeloop()
+	return &sock, nil
+}
+
+func (sock *WSocket) Write() chan RawMessage {
+	return sock.clientToSock.in
+}
+
+func (sock *WSocket) Close() {
+	sock.Conn.Close()
+	sock.clientToSock.Stop()
+}
+
+func (sock *WSocket) writeloop() {
+	go func() {
+		for incoming := range sock.clientToSock.out {
+			_, err := sock.Conn.Write(incoming) //Add check for sending full
+			if err != nil {
+				return
+			}
+		}
+	}()
+}
+
+func (sock *WSocket) readloop() {
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			_, err := sock.Conn.Read(buf)
+			if err != nil {
+				return
 			}
 		}
 	}()

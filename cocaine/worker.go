@@ -3,7 +3,6 @@ package cocaine
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"runtime/debug"
 	"time"
@@ -147,15 +146,21 @@ type Worker struct {
 	socketIO
 }
 
-func NewWorker() *Worker {
+func NewWorker() (worker *Worker, err error) {
 	sock, err := NewASocket("unix", flag_endpoint, time.Second*5)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
+
+	logger, err := NewLogger()
+	if err != nil {
+		return
+	}
+
 	w := Worker{
 		unpacker:        NewStreamUnpacker(),
 		uuid:            flag_uuid,
-		logger:          NewLogger(),
+		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
 		sessions:        make(map[int64](*Request)),
@@ -165,7 +170,8 @@ func NewWorker() *Worker {
 	w.disown_timer.Stop()
 	w.handshake()
 	w.heartbeat()
-	return &w
+	worker = &w
+	return
 }
 
 func (worker *Worker) Loop(bind map[string]EventHandler) {

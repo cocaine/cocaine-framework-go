@@ -1,9 +1,9 @@
 package cocaine
 
 import (
-	"github.com/ugorji/go/codec"
-	"log"
 	"time"
+
+	"github.com/ugorji/go/codec"
 )
 
 type ServiceResult interface {
@@ -84,7 +84,6 @@ type Service struct {
 func NewService(name string, args ...interface{}) (s *Service, err error) {
 	l, err := NewLocator(args...)
 	if err != nil {
-		log.Println(err)
 		return
 	}
 	defer l.Close()
