@@ -57,16 +57,32 @@ func (logger *Logger) Err(message ...interface{}) {
 	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, message...)
 }
 
+func (logger *Logger) Errf(format string, args ...interface{}) {
+	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, fmt.Sprintf(format, args...))
+}
+
 func (logger *Logger) Warn(message ...interface{}) {
 	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, message...)
+}
+
+func (logger *Logger) Warnf(format string, args ...interface{}) {
+	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Info(message ...interface{}) {
 	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, message...)
 }
 
+func (logger *Logger) Infof(format string, args ...interface{}) {
+	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, fmt.Sprintf(format, args...))
+}
+
 func (logger *Logger) Debug(message ...interface{}) {
 	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, message...)
+}
+
+func (logger *Logger) Debugf(format string, args ...interface{}) {
+	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Close() {
