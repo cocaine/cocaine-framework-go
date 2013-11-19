@@ -39,7 +39,7 @@ func (r *ResolveResult) getMethodNumber(name string) (number int64, err error) {
 }
 
 type Locator struct {
-	unpacker *StreamUnpacker
+	unpacker *streamUnpacker
 	socketIO
 }
 
@@ -52,14 +52,14 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 		}
 	}
 
-	sock, err := NewASocket("tcp", endpoint, time.Second*5)
+	sock, err := newAsyncRWSocket("tcp", endpoint, time.Second*5)
 	if err != nil {
 		return nil, err
 	}
-	return &Locator{NewStreamUnpacker(), sock}, nil
+	return &Locator{newStreamUnpacker(), sock}, nil
 }
 
-func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
+func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
 	// defer func() {
 	// 	if err := recover(); err != nil {
 	// 		log.Println("defer", err)
@@ -78,16 +78,16 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 	go func() {
 		var resolveresult ResolveResult
 		resolveresult.success = false
-		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
-		locator.socketIO.Write() <- Pack(&msg)
+		msg := ServiceMethod{messageInfo{0, 0}, []interface{}{name}}
+		locator.socketIO.Write() <- packMsg(&msg)
 		closed := false
 		for !closed {
 			answer := <-locator.socketIO.Read()
 			msgs := locator.unpacker.Feed(answer)
 			for _, item := range msgs {
-				switch id := item.GetTypeID(); id {
+				switch id := item.getTypeID(); id {
 				case CHUNK:
-					resolveresult = locator.unpackchunk(item.GetPayload()[0].([]byte))
+					resolveresult = locator.unpackchunk(item.getPayload()[0].([]byte))
 					resolveresult.success = true
 				case CHOKE:
 					closed = true

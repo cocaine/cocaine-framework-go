@@ -30,7 +30,6 @@ const (
 	DISOWN_TIMEOUT    = time.Second * 5
 )
 
-//Request
 type Request struct {
 	from_worker chan []byte
 	to_handler  chan []byte
@@ -39,7 +38,7 @@ type Request struct {
 
 type EventHandler func(*Request, *Response)
 
-func NewRequest() *Request {
+func newRequest() *Request {
 	request := Request{make(chan []byte), make(chan []byte), make(chan bool)}
 	go func() {
 		var pending [][]byte
@@ -81,22 +80,22 @@ func (request *Request) Read() chan []byte {
 	return request.to_handler
 }
 
-//Response
+// Datastream from worker to a client.
 type Response struct {
 	session      int64
 	from_handler chan []byte
-	to_worker    chan RawMessage
+	to_worker    chan rawMessage
 	quit         chan bool
 }
 
-func NewResponse(session int64, to_worker chan RawMessage) *Response {
+func newResponse(session int64, to_worker chan rawMessage) *Response {
 	response := Response{session, make(chan []byte), to_worker, make(chan bool)}
 	go func() {
 		var pending [][]byte
 		quit := false
 		for {
-			var out chan RawMessage
-			var first RawMessage
+			var out chan rawMessage
+			var first rawMessage
 			if len(pending) > 0 {
 				first = pending[0]
 				out = to_worker
@@ -119,35 +118,40 @@ func NewResponse(session int64, to_worker chan RawMessage) *Response {
 	return &response
 }
 
+// Send chunk of data to a client.
 func (response *Response) Write(data interface{}) {
 	var res []byte
 	codec.NewEncoderBytes(&res, h).Encode(&data)
-	response.from_handler <- Pack(&Chunk{MessageInfo{CHUNK, response.session}, res})
+	response.from_handler <- packMsg(&chunk{messageInfo{CHUNK, response.session}, res})
 }
 
+// Notify a client about finishing the datastream.
 func (response *Response) Close() {
-	response.from_handler <- Pack(&Choke{MessageInfo{CHOKE, response.session}})
+	response.from_handler <- packMsg(&choke{messageInfo{CHOKE, response.session}})
 	response.quit <- true
 }
 
+// Send error to a client. Specify code and message, which describes this error.
 func (response *Response) ErrorMsg(code int, msg string) {
-	response.from_handler <- Pack(&ErrorMsg{MessageInfo{ERROR, response.session}, code, msg})
+	response.from_handler <- packMsg(&errorMsg{messageInfo{ERROR, response.session}, code, msg})
 }
 
-//Worker
+// Worker struct performs IO operations between application
+// and cocaine-runtime. Dispatch incoming messages from runtime.
 type Worker struct {
-	unpacker        *StreamUnpacker
+	unpacker        *streamUnpacker
 	uuid            string
 	logger          *Logger
 	heartbeat_timer *time.Timer
 	disown_timer    *time.Timer
 	sessions        map[int64](*Request)
-	from_handlers   chan RawMessage
+	from_handlers   chan rawMessage
 	socketIO
 }
 
+// Create new instance of Worker. Return error on fail.
 func NewWorker() (worker *Worker, err error) {
-	sock, err := NewASocket("unix", flag_endpoint, time.Second*5)
+	sock, err := newAsyncRWSocket("unix", flag_endpoint, time.Second*5)
 	if err != nil {
 		return
 	}
@@ -158,13 +162,13 @@ func NewWorker() (worker *Worker, err error) {
 	}
 
 	w := Worker{
-		unpacker:        NewStreamUnpacker(),
+		unpacker:        newStreamUnpacker(),
 		uuid:            flag_uuid,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
 		sessions:        make(map[int64](*Request)),
-		from_handlers:   make(chan RawMessage),
+		from_handlers:   make(chan rawMessage),
 		socketIO:        sock,
 	}
 	w.disown_timer.Stop()
@@ -174,6 +178,7 @@ func NewWorker() (worker *Worker, err error) {
 	return
 }
 
+// Initialize worker in runtime as starting. Launch eventloop.
 func (worker *Worker) Loop(bind map[string]EventHandler) {
 	for {
 		select {
@@ -181,20 +186,20 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			msgs := worker.unpacker.Feed(answer)
 			for _, rawmsg := range msgs {
 				switch msg := rawmsg.(type) {
-				case *Chunk:
+				case *chunk:
 					worker.logger.Debug("Receive chunk")
-					worker.sessions[msg.GetSessionID()].push(msg.Data)
+					worker.sessions[msg.getSessionID()].push(msg.Data)
 
-				case *Choke:
+				case *choke:
 					worker.logger.Debug("Receive choke")
-					worker.sessions[msg.GetSessionID()].close()
-					delete(worker.sessions, msg.GetSessionID())
+					worker.sessions[msg.getSessionID()].close()
+					delete(worker.sessions, msg.getSessionID())
 
-				case *Invoke:
-					worker.logger.Debug(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.GetSessionID()))
-					cur_session := msg.GetSessionID()
-					req := NewRequest()
-					resp := NewResponse(cur_session, worker.from_handlers)
+				case *invoke:
+					worker.logger.Debug(fmt.Sprintf("Receive invoke %s %d", msg.Event, msg.getSessionID()))
+					cur_session := msg.getSessionID()
+					req := newRequest()
+					resp := newResponse(cur_session, worker.from_handlers)
 					worker.sessions[cur_session] = req
 					if callback, ok := bind[msg.Event]; ok {
 						go func() {
@@ -216,11 +221,11 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 						resp.Close()
 					}
 
-				case *Heartbeat:
+				case *heartbeat:
 					worker.logger.Debug("Receive heartbeat. Stop disown_timer")
 					worker.disown_timer.Stop()
 
-				case *Terminate:
+				case *terminateStruct:
 					worker.logger.Debug("Receive terminate")
 					os.Exit(0)
 
@@ -242,13 +247,13 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 }
 
 func (worker *Worker) heartbeat() {
-	heartbeat := Heartbeat{MessageInfo{HEARTBEAT, 0}}
-	worker.Write() <- Pack(&heartbeat)
+	heartbeat := heartbeat{messageInfo{HEARTBEAT, 0}}
+	worker.Write() <- packMsg(&heartbeat)
 	worker.disown_timer.Reset(DISOWN_TIMEOUT)
 	worker.heartbeat_timer.Reset(HEARTBEAT_TIMEOUT)
 }
 
 func (worker *Worker) handshake() {
-	handshake := Handshake{MessageInfo{HANDSHAKE, 0}, worker.uuid}
-	worker.Write() <- Pack(&handshake)
+	handshake := handshakeStruct{messageInfo{HANDSHAKE, 0}, worker.uuid}
+	worker.Write() <- packMsg(&handshake)
 }

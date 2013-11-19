@@ -36,7 +36,7 @@ func NewLogger() (logger *Logger, err error) {
 		return
 	}
 
-	sock, err := NewWSocket("tcp", temp.ResolveResult.AsString(), time.Second*5)
+	sock, err := newWSocket("tcp", temp.ResolveResult.AsString(), time.Second*5)
 	if err != nil {
 		return
 	}
@@ -48,8 +48,8 @@ func NewLogger() (logger *Logger, err error) {
 
 // Blocked
 func (logger *Logger) log(level int64, message ...interface{}) bool {
-	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
-	logger.Write() <- Pack(&msg)
+	msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
+	logger.Write() <- packMsg(&msg)
 	return true
 }
 

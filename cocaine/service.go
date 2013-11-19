@@ -11,17 +11,17 @@ type ServiceResult interface {
 	Err() error
 }
 
-type ServiceRes struct {
+type serviceRes struct {
 	res []byte
 	err error
 }
 
-func (s *ServiceRes) Extract(target interface{}) (err error) {
+func (s *serviceRes) Extract(target interface{}) (err error) {
 	err = codec.NewDecoderBytes(s.res, h).Decode(&target)
 	return
 }
 
-func (s *ServiceRes) Err() error {
+func (s *serviceRes) Err() error {
 	return s.err
 }
 
@@ -35,7 +35,7 @@ func (err *ServiceError) Error() string {
 	return err.Message
 }
 
-func GetServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan ServiceResult) {
+func getServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan ServiceResult) {
 	In = make(chan ServiceResult)
 	Out = make(chan ServiceResult)
 	finished := false
@@ -74,8 +74,8 @@ func GetServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan Servi
 }
 
 type Service struct {
-	sessions *Keeper
-	unpacker *StreamUnpacker
+	sessions *keeperStruct
+	unpacker *streamUnpacker
 	stop     chan bool
 	ResolveResult
 	socketIO
@@ -88,13 +88,13 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 	}
 	defer l.Close()
 	info := <-l.Resolve(name)
-	sock, err := NewASocket("tcp", info.Endpoint.AsString(), time.Second*5)
+	sock, err := newAsyncRWSocket("tcp", info.Endpoint.AsString(), time.Second*5)
 	if err != nil {
 		return
 	}
 	s = &Service{
-		sessions:      NewKeeper(),
-		unpacker:      NewStreamUnpacker(),
+		sessions:      newKeeperStruct(),
+		unpacker:      newStreamUnpacker(),
 		stop:          make(chan bool),
 		ResolveResult: info,
 		socketIO:      sock,
@@ -107,13 +107,13 @@ func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
 		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
-			case *Chunk:
-				service.sessions.Get(msg.GetSessionID()) <- &ServiceRes{msg.Data, nil}
-			case *Choke:
-				close(service.sessions.Get(msg.GetSessionID()))
-				service.sessions.Detach(msg.GetSessionID())
-			case *ErrorMsg:
-				service.sessions.Get(msg.GetSessionID()) <- &ServiceRes{nil, &ServiceError{msg.Code, msg.Message}}
+			case *chunk:
+				service.sessions.Get(msg.getSessionID()) <- &serviceRes{msg.Data, nil}
+			case *choke:
+				close(service.sessions.Get(msg.getSessionID()))
+				service.sessions.Detach(msg.getSessionID())
+			case *errorMsg:
+				service.sessions.Get(msg.getSessionID()) <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
 			}
 		}
 	}
@@ -123,13 +123,13 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 	method, err := service.getMethodNumber(name)
 	if err != nil {
 		errorOut := make(chan ServiceResult, 1)
-		errorOut <- &ServiceRes{nil, &ServiceError{-100, "Wrong method name"}}
+		errorOut <- &serviceRes{nil, &ServiceError{-100, "Wrong method name"}}
 		return errorOut
 	}
-	in, out := GetServiceChanPair(service.stop)
+	in, out := getServiceChanPair(service.stop)
 	id := service.sessions.Attach(in)
-	msg := ServiceMethod{MessageInfo{method, id}, args}
-	service.socketIO.Write() <- Pack(&msg)
+	msg := ServiceMethod{messageInfo{method, id}, args}
+	service.socketIO.Write() <- packMsg(&msg)
 	return out
 }
 

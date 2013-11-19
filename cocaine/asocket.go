@@ -6,37 +6,37 @@ import (
 )
 
 type socketIO interface {
-	Read() chan RawMessage
-	Write() chan RawMessage
+	Read() chan rawMessage
+	Write() chan rawMessage
 	Close()
 }
 
 type socketWriter interface {
-	Write() chan RawMessage
+	Write() chan rawMessage
 	Close()
 }
 
 type asyncBuff struct {
-	in, out chan RawMessage
+	in, out chan rawMessage
 	stop    chan bool
 }
 
 func newAsyncBuf() *asyncBuff {
-	buf := asyncBuff{make(chan RawMessage), make(chan RawMessage), make(chan bool, 1)}
+	buf := asyncBuff{make(chan rawMessage), make(chan rawMessage), make(chan bool, 1)}
 	buf.loop()
 	return &buf
 }
 
 func (bf *asyncBuff) loop() {
 	go func() {
-		var pending []RawMessage // data buffer
-		var _in chan RawMessage  // incoming channel
+		var pending []rawMessage // data buffer
+		var _in chan rawMessage  // incoming channel
 		_in = bf.in
 
 		finished := false // flag
 		for {
-			var first RawMessage
-			var _out chan RawMessage
+			var first rawMessage
+			var _out chan rawMessage
 			if len(pending) > 0 {
 				first = pending[0]
 				_out = bf.out
@@ -68,41 +68,41 @@ func (bf *asyncBuff) Stop() (res bool) {
 }
 
 // Biderectional socket
-type ASocket struct {
+type asyncRWSocket struct {
 	net.Conn
 	closed         chan bool
 	clientToSock   *asyncBuff
 	socketToClient *asyncBuff
 }
 
-func NewASocket(family string, address string, timeout time.Duration) (*ASocket, error) {
+func newAsyncRWSocket(family string, address string, timeout time.Duration) (*asyncRWSocket, error) {
 	conn, err := net.DialTimeout(family, address, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	sock := ASocket{conn, make(chan bool), newAsyncBuf(), newAsyncBuf()}
+	sock := asyncRWSocket{conn, make(chan bool), newAsyncBuf(), newAsyncBuf()}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
 }
 
-func (sock *ASocket) Close() {
+func (sock *asyncRWSocket) Close() {
 	close(sock.closed)
 	sock.clientToSock.Stop()
 	sock.socketToClient.Stop()
 	sock.Conn.Close()
 }
 
-func (sock *ASocket) Write() chan RawMessage {
+func (sock *asyncRWSocket) Write() chan rawMessage {
 	return sock.clientToSock.in
 }
 
-func (sock *ASocket) Read() chan RawMessage {
+func (sock *asyncRWSocket) Read() chan rawMessage {
 	return sock.socketToClient.out
 }
 
-func (sock *ASocket) writeloop() {
+func (sock *asyncRWSocket) writeloop() {
 	go func() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
@@ -113,7 +113,7 @@ func (sock *ASocket) writeloop() {
 	}()
 }
 
-func (sock *ASocket) readloop() {
+func (sock *asyncRWSocket) readloop() {
 	go func() {
 		buf := make([]byte, 2048)
 		for {
@@ -131,34 +131,34 @@ func (sock *ASocket) readloop() {
 }
 
 // WriteOnly Socket
-type WSocket struct {
+type asyncWSocket struct {
 	net.Conn
 	state        chan bool
 	clientToSock *asyncBuff
 }
 
-func NewWSocket(family string, address string, timeout time.Duration) (*WSocket, error) {
+func newWSocket(family string, address string, timeout time.Duration) (*asyncWSocket, error) {
 	conn, err := net.DialTimeout(family, address, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	sock := WSocket{conn, make(chan bool), newAsyncBuf()}
+	sock := asyncWSocket{conn, make(chan bool), newAsyncBuf()}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
 }
 
-func (sock *WSocket) Write() chan RawMessage {
+func (sock *asyncWSocket) Write() chan rawMessage {
 	return sock.clientToSock.in
 }
 
-func (sock *WSocket) Close() {
+func (sock *asyncWSocket) Close() {
 	sock.Conn.Close()
 	sock.clientToSock.Stop()
 }
 
-func (sock *WSocket) writeloop() {
+func (sock *asyncWSocket) writeloop() {
 	go func() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
@@ -169,7 +169,7 @@ func (sock *WSocket) writeloop() {
 	}()
 }
 
-func (sock *WSocket) readloop() {
+func (sock *asyncWSocket) readloop() {
 	go func() {
 		buf := make([]byte, 2048)
 		for {
