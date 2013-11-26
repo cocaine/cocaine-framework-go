@@ -1,15 +1,19 @@
 package cocaine
 
 import (
-	"github.com/ugorji/go/codec"
+	"errors"
 	"fmt"
 	"log"
-	"reflect"
+	"time"
+
+	"github.com/ugorji/go/codec"
 )
+
+const DEFAULT_LOCATOR_PORT = 10053
 
 type Endpoint struct {
 	Host string
-	Port uint64
+	Port int
 }
 
 func (endpoint *Endpoint) AsString() string {
@@ -17,50 +21,56 @@ func (endpoint *Endpoint) AsString() string {
 }
 
 type ResolveResult struct {
-	success bool
-	Endpoint
-	Version int64
-	API     map[int]string
+	success  bool
+	Endpoint `codec:",omitempty"`
+	Version  int
+	API      map[int64]string
+}
+
+func (r *ResolveResult) getMethodNumber(name string) (number int64, err error) {
+	for key, value := range r.API {
+		if value == name {
+			number = key
+			return
+		}
+	}
+	err = errors.New("Missing method")
+	return
 }
 
 type Locator struct {
-	host     string
-	port     uint64
-	pipe     *Pipe
-	unpacker *StreamUnpacker
-	wr_in    chan RawMessage
-	r_out    chan RawMessage
+	unpacker *streamUnpacker
+	socketIO
 }
 
-func NewLocator(host string, port uint64) *Locator {
-	wr_in, wr_out := Transmite()
-	r_in, r_out := Transmite()
-	pipe := NewPipe("tcp", fmt.Sprintf("%s:%d", host, port), &wr_out, &r_in)
-	return &Locator{host, port, pipe, NewStreamUnpacker(), wr_in, r_out}
-}
+func NewLocator(args ...interface{}) (*Locator, error) {
+	var endpoint string = "localhost:10053"
 
-func (locator *Locator) unpackchunk(chunk RawMessage) ResolveResult {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println("defer", err)
+	if len(args) == 1 {
+		if _endpoint, ok := args[0].(string); ok {
+			endpoint = _endpoint
 		}
-	}()
-	var v []interface{}
-	var MH codec.MsgpackHandle
-	MH.MapType = reflect.TypeOf(map[int]string(nil))
-	err := codec.NewDecoderBytes(chunk, &MH).Decode(&v)
+	}
+
+	sock, err := newAsyncRWSocket("tcp", endpoint, time.Second*5)
+	if err != nil {
+		return nil, err
+	}
+	return &Locator{newStreamUnpacker(), sock}, nil
+}
+
+func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
+	// defer func() {
+	// 	if err := recover(); err != nil {
+	// 		log.Println("defer", err)
+	// 	}
+	// }()
+	var res ResolveResult
+	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
 	if err != nil {
 		log.Println("unpack chunk error", err)
 	}
-	if len(v) == 3 {
-		v_endpoint := v[0].([]interface{})
-		endpoint := Endpoint{string(v_endpoint[0].([]uint8)), v_endpoint[1].(uint64)}
-		version := v[1].(int64)
-		api := v[2].(map[int]string)
-		return ResolveResult{true, endpoint, version, api}
-	} else {
-		panic("Bad format")
-	}
+	return res
 }
 
 func (locator *Locator) Resolve(name string) chan ResolveResult {
@@ -68,17 +78,16 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 	go func() {
 		var resolveresult ResolveResult
 		resolveresult.success = false
-		msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{name}}
-		raw := Pack(&msg)
-		locator.wr_in <- raw
+		msg := ServiceMethod{messageInfo{0, 0}, []interface{}{name}}
+		locator.socketIO.Write() <- packMsg(&msg)
 		closed := false
 		for !closed {
-			answer := <-locator.r_out
-			msgs := locator.unpacker.Feed(answer) //DecodeRaw(answer, &left)
+			answer := <-locator.socketIO.Read()
+			msgs := locator.unpacker.Feed(answer)
 			for _, item := range msgs {
-				switch id := item.GetTypeID(); id {
+				switch id := item.getTypeID(); id {
 				case CHUNK:
-					resolveresult = locator.unpackchunk(item.GetPayload()[0].([]byte))
+					resolveresult = locator.unpackchunk(item.getPayload()[0].([]byte))
 					resolveresult.success = true
 				case CHOKE:
 					closed = true
@@ -88,4 +97,8 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		Out <- resolveresult
 	}()
 	return Out
+}
+
+func (locator *Locator) Close() {
+	locator.socketIO.Close()
 }

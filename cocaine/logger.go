@@ -1,56 +1,90 @@
 package cocaine
 
 import (
+	"errors"
 	"fmt"
-	"runtime/debug"
+	"time"
 )
 
 type Logger struct {
-	host  string
-	port  uint64
-	pipe  *Pipe
-	wr_in chan RawMessage
-	r_out chan RawMessage
+	socketWriter
+	verbosity int
 }
 
 const (
-	_ = iota
+	LOGINGNORE = iota
 	LOGERROR
 	LOGWARN
 	LOGINFO
 	LOGDEBUG
 )
 
-func NewLogger() *Logger {
-	l := NewLocator("localhost", 10053)
-	info := <-l.Resolve("logging")
-	if info.success == false {
-		fmt.Printf("Unable to create logger, could not resolve logging service. Stack trace: \n %s", string(debug.Stack()))
-		return nil
+func NewLogger() (logger *Logger, err error) {
+	temp, err := NewService("logging", "localhost", 10053)
+	if err != nil {
+		return
 	}
-	wr_in, wr_out := Transmite()
-	r_in, r_out := Transmite()
-	pipe := NewPipe("tcp", info.Endpoint.AsString(), &wr_out, &r_in)
-	return &Logger{info.Endpoint.Host, info.Endpoint.Port, pipe, wr_in, r_out}
+	defer temp.Close()
+
+	res := <-temp.Call("verbosity")
+	if res.Err() != nil {
+		err = errors.New("Unable to receive verbosity")
+		return
+	}
+	var verbosity int = 0
+	if err = res.Extract(&verbosity); err != nil {
+		return
+	}
+
+	sock, err := newWSocket("tcp", temp.ResolveResult.AsString(), time.Second*5)
+	if err != nil {
+		return
+	}
+
+	//Create logger
+	logger = &Logger{sock, verbosity}
+	return
 }
 
-func (logger *Logger) log(level int64, message string) {
-	msg := ServiceMethod{MessageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), message}}
-	logger.wr_in <- Pack(&msg)
+// Blocked
+func (logger *Logger) log(level int64, message ...interface{}) bool {
+	msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
+	logger.Write() <- packMsg(&msg)
+	return true
 }
 
-func (logger *Logger) Err(message string) {
-	go logger.log(LOGERROR, message)
+func (logger *Logger) Err(message ...interface{}) {
+	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, message...)
 }
 
-func (logger *Logger) Warn(message string) {
-	go logger.log(LOGWARN, message)
+func (logger *Logger) Errf(format string, args ...interface{}) {
+	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, fmt.Sprintf(format, args...))
 }
 
-func (logger *Logger) Info(message string) {
-	go logger.log(LOGINFO, message)
+func (logger *Logger) Warn(message ...interface{}) {
+	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, message...)
 }
 
-func (logger *Logger) Debug(message string) {
-	go logger.log(LOGDEBUG, message)
+func (logger *Logger) Warnf(format string, args ...interface{}) {
+	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, fmt.Sprintf(format, args...))
+}
+
+func (logger *Logger) Info(message ...interface{}) {
+	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, message...)
+}
+
+func (logger *Logger) Infof(format string, args ...interface{}) {
+	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, fmt.Sprintf(format, args...))
+}
+
+func (logger *Logger) Debug(message ...interface{}) {
+	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, message...)
+}
+
+func (logger *Logger) Debugf(format string, args ...interface{}) {
+	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, fmt.Sprintf(format, args...))
+}
+
+func (logger *Logger) Close() {
+	logger.socketWriter.Close()
 }

@@ -2,10 +2,9 @@ package cocaine
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
 	"fmt"
-	"io"
-	"log"
+
+	"github.com/ugorji/go/codec"
 )
 
 const (
@@ -18,75 +17,75 @@ const (
 	CHOKE
 )
 
-type RawMessage []byte
+type rawMessage []byte
 
 var (
 	mh codec.MsgpackHandle
 	h  = &mh
 )
 
-type MessageInfo struct {
+type messageInfo struct {
 	Number  int64
 	Channel int64
 }
 
-type Handshake struct {
-	MessageInfo
+type handshakeStruct struct {
+	messageInfo
 	Uuid string
 }
 
-type Heartbeat struct {
-	MessageInfo
+type heartbeat struct {
+	messageInfo
 }
 
-type Terminate struct {
-	MessageInfo
+type terminateStruct struct {
+	messageInfo
 	Reason  string
 	Message string
 }
 
-type Invoke struct {
-	MessageInfo
+type invoke struct {
+	messageInfo
 	Event string
 }
 
-type Chunk struct {
-	MessageInfo
+type chunk struct {
+	messageInfo
 	Data []byte
 }
 
-type ErrorMsg struct {
-	MessageInfo
+type errorMsg struct {
+	messageInfo
 	Code    int
 	Message string
 }
 
-type Choke struct {
-	MessageInfo
+type choke struct {
+	messageInfo
 }
 
 type ServiceMethod struct {
-	MessageInfo
+	messageInfo
 	Data []interface{}
 }
 
-type Message interface {
-	GetTypeID() int64
-	GetSessionID() int64
-	GetPayload() []interface{}
+type messageInterface interface {
+	getTypeID() int64
+	getSessionID() int64
+	getPayload() []interface{}
 }
 
-func (msg *MessageInfo) GetTypeID() int64 {
+func (msg *messageInfo) getTypeID() int64 {
 	return msg.Number
 }
 
-func (msg *MessageInfo) GetSessionID() int64 {
+func (msg *messageInfo) getSessionID() int64 {
 	return msg.Channel
 }
 
-func Pack(msg Message) RawMessage {
+func packMsg(msg messageInterface) rawMessage {
 	var buf []byte
-	err := codec.NewEncoderBytes(&buf, h).Encode([]interface{}{msg.GetTypeID(), msg.GetSessionID(), msg.GetPayload()})
+	err := codec.NewEncoderBytes(&buf, h).Encode([]interface{}{msg.getTypeID(), msg.getSessionID(), msg.getPayload()})
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -94,34 +93,34 @@ func Pack(msg Message) RawMessage {
 }
 
 //ServiceMethod
-func (msg *ServiceMethod) GetPayload() []interface{} {
+func (msg *ServiceMethod) getPayload() []interface{} {
 	return msg.Data
 }
 
-// Handshake
-func UnpackHandshake(session int64, data []interface{}) *Handshake {
+// handshakeStruct
+func unpackHandshake(session int64, data []interface{}) *handshakeStruct {
 	var uuid string
 	if uuid_t, ok := data[0].([]byte); ok {
 		uuid = string(uuid_t)
 	}
-	return &Handshake{MessageInfo{HANDSHAKE, session}, uuid}
+	return &handshakeStruct{messageInfo{HANDSHAKE, session}, uuid}
 }
 
-func (msg *Handshake) GetPayload() []interface{} {
+func (msg *handshakeStruct) getPayload() []interface{} {
 	return []interface{}{msg.Uuid}
 }
 
-// Heartbeat
-func UnpackHeartbeat(session int64, data []interface{}) *Heartbeat {
-	return &Heartbeat{MessageInfo{HEARTBEAT, session}}
+// heartbeat
+func unpackHeartbeat(session int64, data []interface{}) *heartbeat {
+	return &heartbeat{messageInfo{HEARTBEAT, session}}
 }
 
-func (msg *Heartbeat) GetPayload() []interface{} {
+func (msg *heartbeat) getPayload() []interface{} {
 	return []interface{}{}
 }
 
-// Terminate
-func UnpackTerminate(session int64, data []interface{}) *Terminate {
+// terminateStruct
+func unpackTerminate(session int64, data []interface{}) *terminateStruct {
 	var reason, message string
 	if reason_t, ok := data[0].([]byte); ok {
 		reason = string(reason_t)
@@ -129,40 +128,40 @@ func UnpackTerminate(session int64, data []interface{}) *Terminate {
 	if message_t, ok := data[1].([]byte); ok {
 		message = string(message_t)
 	}
-	return &Terminate{MessageInfo{TERMINATE, session}, reason, message}
+	return &terminateStruct{messageInfo{TERMINATE, session}, reason, message}
 }
 
-func (msg *Terminate) GetPayload() []interface{} {
+func (msg *terminateStruct) getPayload() []interface{} {
 	return []interface{}{msg.Reason, msg.Message}
 }
 
-// Invoke
-func UnpackInvoke(session int64, data []interface{}) *Invoke {
+// invoke
+func unpackInvoke(session int64, data []interface{}) *invoke {
 	var event string
 	if event_t, ok := data[0].([]byte); ok {
 		event = string(event_t)
 	} else {
 		fmt.Println("Errror")
 	}
-	return &Invoke{MessageInfo{INVOKE, session}, event}
+	return &invoke{messageInfo{INVOKE, session}, event}
 }
 
-func (msg *Invoke) GetPayload() []interface{} {
+func (msg *invoke) getPayload() []interface{} {
 	return []interface{}{msg.Event}
 }
 
-// Chunk
-func UnpackChunk(session int64, data []interface{}) *Chunk {
+// chunk
+func unpackChunk(session int64, data []interface{}) *chunk {
 	msg_data := data[0].([]byte)
-	return &Chunk{MessageInfo{CHUNK, session}, msg_data}
+	return &chunk{messageInfo{CHUNK, session}, msg_data}
 }
 
-func (msg *Chunk) GetPayload() []interface{} {
+func (msg *chunk) getPayload() []interface{} {
 	return []interface{}{msg.Data}
 }
 
 // Error
-func UnpackErrorMsg(session int64, data []interface{}) *ErrorMsg {
+func unpackErrorMsg(session int64, data []interface{}) *errorMsg {
 	var code int
 	var message string
 	if code_t, ok := data[0].(int); ok {
@@ -171,24 +170,24 @@ func UnpackErrorMsg(session int64, data []interface{}) *ErrorMsg {
 	if message_t, ok := data[1].([]byte); ok {
 		message = string(message_t)
 	}
-	return &ErrorMsg{MessageInfo{ERROR, session}, code, message}
+	return &errorMsg{messageInfo{ERROR, session}, code, message}
 }
 
-func (msg *ErrorMsg) GetPayload() []interface{} {
+func (msg *errorMsg) getPayload() []interface{} {
 	return []interface{}{msg.Code, msg.Message}
 }
 
-// Choke
-func UnpackChoke(session int64, data []interface{}) *Choke {
-	return &Choke{MessageInfo{CHOKE, session}}
+// choke
+func unpackChoke(session int64, data []interface{}) *choke {
+	return &choke{messageInfo{CHOKE, session}}
 }
 
-func (msg *Choke) GetPayload() []interface{} {
+func (msg *choke) getPayload() []interface{} {
 	return []interface{}{}
 }
 
 // Common unpacker
-func UnpackMessage(input []interface{}) Message {
+func unpackMessage(input []interface{}) messageInterface {
 	defer func() {
 		z := recover()
 		if z != nil {
@@ -204,35 +203,35 @@ func UnpackMessage(input []interface{}) Message {
 	case int64:
 		session = input[1].(int64)
 	}
-	
+
 	data := input[2].([]interface{})
 
 	switch input[0].(int64) {
 	case HANDSHAKE:
-		return UnpackHandshake(session, data)
+		return unpackHandshake(session, data)
 	case HEARTBEAT:
-		return UnpackHeartbeat(session, data)
+		return unpackHeartbeat(session, data)
 	case TERMINATE:
-		return UnpackTerminate(session, data)
+		return unpackTerminate(session, data)
 	case INVOKE:
-		return UnpackInvoke(session, data)
+		return unpackInvoke(session, data)
 	case CHUNK:
-		return UnpackChunk(session, data)
+		return unpackChunk(session, data)
 	case ERROR:
-		return UnpackErrorMsg(session, data)
+		return unpackErrorMsg(session, data)
 	case CHOKE:
-		return UnpackChoke(session, data)
+		return unpackChoke(session, data)
 	default:
 		panic("Invalid message")
 	}
 }
 
-type StreamUnpacker struct {
+type streamUnpacker struct {
 	buf []byte
 }
 
-func (unpacker *StreamUnpacker) Feed(data []byte) []Message {
-	var msgs []Message
+func (unpacker *streamUnpacker) Feed(data []byte) []messageInterface {
+	var msgs []messageInterface
 	unpacker.buf = append(unpacker.buf, data...)
 	tmp := bytes.NewBuffer(unpacker.buf)
 	dec := codec.NewDecoder(tmp, h)
@@ -240,12 +239,9 @@ func (unpacker *StreamUnpacker) Feed(data []byte) []Message {
 		var res []interface{}
 		err := dec.Decode(&res)
 		if err != nil {
-			if err != io.EOF {
-				log.Println(err)
-			}
 			break
 		} else {
-			msgs = append(msgs, UnpackMessage(res))
+			msgs = append(msgs, unpackMessage(res))
 			unpacker.buf = unpacker.buf[len(unpacker.buf)-tmp.Len():]
 		}
 
@@ -253,6 +249,6 @@ func (unpacker *StreamUnpacker) Feed(data []byte) []Message {
 	return msgs
 }
 
-func NewStreamUnpacker() *StreamUnpacker {
-	return &StreamUnpacker{make([]byte, 0)}
+func newStreamUnpacker() *streamUnpacker {
+	return &streamUnpacker{make([]byte, 0)}
 }
