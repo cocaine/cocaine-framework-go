@@ -19,8 +19,8 @@ const (
 	LOGDEBUG
 )
 
-func NewLogger() (logger *Logger, err error) {
-	temp, err := NewService("logging", "localhost", 10053)
+func NewLogger(args ...interface{}) (logger *Logger, err error) {
+	temp, err := NewService("logging", args...)
 	if err != nil {
 		return
 	}
