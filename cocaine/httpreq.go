@@ -27,6 +27,9 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 		return nil, err
 	}
 	r.Header = CocaineHeaderToHttpHeader(v[3].(Headers))
+
+	r.Host= r.Header.Get("Host")
+
 	if xRealIp := r.Header.Get("X-Real-IP"); xRealIp != "" {
 		r.RemoteAddr = xRealIp
 	}
