@@ -108,12 +108,18 @@ func (service *Service) loop() {
 		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
 			case *chunk:
-				service.sessions.Get(msg.getSessionID()) <- &serviceRes{msg.Data, nil}
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					ch <- &serviceRes{msg.Data, nil}
+				}
 			case *choke:
-				close(service.sessions.Get(msg.getSessionID()))
-				service.sessions.Detach(msg.getSessionID())
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					close(ch)
+					service.sessions.Detach(msg.getSessionID())
+				}
 			case *errorMsg:
-				service.sessions.Get(msg.getSessionID()) <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
+				}
 			}
 		}
 	}

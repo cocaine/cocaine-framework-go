@@ -28,9 +28,9 @@ func (keeper *keeperStruct) Detach(id int64) {
 	delete(keeper.links, id)
 }
 
-func (keeper *keeperStruct) Get(id int64) chan ServiceResult {
+func (keeper *keeperStruct) Get(id int64) (ch chan ServiceResult, ok bool) {
 	defer keeper.RUnlock()
 	keeper.RLock()
-	i := keeper.links[id]
-	return i
+	ch, ok = keeper.links[id]
+	return
 }
