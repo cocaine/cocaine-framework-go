@@ -3,7 +3,6 @@ package cocaine
 import (
 	"flag"
 	"fmt"
-	"os"
 	"runtime/debug"
 	"time"
 
@@ -226,11 +225,11 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 					worker.disown_timer.Stop()
 
 				case *terminateStruct:
-					worker.logger.Debug("Receive terminate")
-					os.Exit(0)
+					worker.logger.Info("Receive terminate")
+					return
 
 				default:
-					worker.logger.Debug("Unknown message")
+					worker.logger.Warn("Unknown message")
 				}
 			}
 		case <-worker.heartbeat_timer.C:
@@ -238,7 +237,8 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			worker.heartbeat()
 
 		case <-worker.disown_timer.C:
-			worker.logger.Debug("Disowned")
+			worker.logger.Info("Disowned")
+			return
 
 		case outcoming := <-worker.from_handlers:
 			worker.Write() <- outcoming
