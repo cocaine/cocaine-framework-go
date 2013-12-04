@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
 
@@ -31,7 +32,7 @@ type messageInfo struct {
 
 type handshakeStruct struct {
 	messageInfo
-	Uuid string
+	Uuid uuid.UUID
 }
 
 type heartbeat struct {
@@ -98,21 +99,26 @@ func (msg *ServiceMethod) getPayload() []interface{} {
 }
 
 // handshakeStruct
-func unpackHandshake(session int64, data []interface{}) *handshakeStruct {
-	var uuid string
+func unpackHandshake(session int64, data []interface{}) (msg messageInterface, err error) {
+	u := uuid.UUID{}
 	if uuid_t, ok := data[0].([]byte); ok {
-		uuid = string(uuid_t)
+		u, err = uuid.FromString(string(uuid_t))
+		if err != nil {
+			return
+		}
 	}
-	return &handshakeStruct{messageInfo{HANDSHAKE, session}, uuid}
+	msg = &handshakeStruct{messageInfo{HANDSHAKE, session}, u}
+	return
 }
 
 func (msg *handshakeStruct) getPayload() []interface{} {
-	return []interface{}{msg.Uuid}
+	return []interface{}{msg.Uuid.String()}
 }
 
 // heartbeat
-func unpackHeartbeat(session int64, data []interface{}) *heartbeat {
-	return &heartbeat{messageInfo{HEARTBEAT, session}}
+func unpackHeartbeat(session int64, data []interface{}) (msg messageInterface, err error) {
+	msg = &heartbeat{messageInfo{HEARTBEAT, session}}
+	return
 }
 
 func (msg *heartbeat) getPayload() []interface{} {
@@ -120,7 +126,7 @@ func (msg *heartbeat) getPayload() []interface{} {
 }
 
 // terminateStruct
-func unpackTerminate(session int64, data []interface{}) *terminateStruct {
+func unpackTerminate(session int64, data []interface{}) (msg messageInterface, err error) {
 	var reason, message string
 	if reason_t, ok := data[0].([]byte); ok {
 		reason = string(reason_t)
@@ -128,7 +134,8 @@ func unpackTerminate(session int64, data []interface{}) *terminateStruct {
 	if message_t, ok := data[1].([]byte); ok {
 		message = string(message_t)
 	}
-	return &terminateStruct{messageInfo{TERMINATE, session}, reason, message}
+	msg = &terminateStruct{messageInfo{TERMINATE, session}, reason, message}
+	return
 }
 
 func (msg *terminateStruct) getPayload() []interface{} {
@@ -136,14 +143,15 @@ func (msg *terminateStruct) getPayload() []interface{} {
 }
 
 // invoke
-func unpackInvoke(session int64, data []interface{}) *invoke {
+func unpackInvoke(session int64, data []interface{}) (msg messageInterface, err error) {
 	var event string
 	if event_t, ok := data[0].([]byte); ok {
 		event = string(event_t)
 	} else {
 		fmt.Println("Errror")
 	}
-	return &invoke{messageInfo{INVOKE, session}, event}
+	msg = &invoke{messageInfo{INVOKE, session}, event}
+	return
 }
 
 func (msg *invoke) getPayload() []interface{} {
@@ -151,9 +159,10 @@ func (msg *invoke) getPayload() []interface{} {
 }
 
 // chunk
-func unpackChunk(session int64, data []interface{}) *chunk {
+func unpackChunk(session int64, data []interface{}) (msg messageInterface, err error) {
 	msg_data := data[0].([]byte)
-	return &chunk{messageInfo{CHUNK, session}, msg_data}
+	msg = &chunk{messageInfo{CHUNK, session}, msg_data}
+	return
 }
 
 func (msg *chunk) getPayload() []interface{} {
@@ -161,7 +170,7 @@ func (msg *chunk) getPayload() []interface{} {
 }
 
 // Error
-func unpackErrorMsg(session int64, data []interface{}) *errorMsg {
+func unpackErrorMsg(session int64, data []interface{}) (msg messageInterface, err error) {
 	var code int
 	var message string
 	if code_t, ok := data[0].(int); ok {
@@ -170,7 +179,8 @@ func unpackErrorMsg(session int64, data []interface{}) *errorMsg {
 	if message_t, ok := data[1].([]byte); ok {
 		message = string(message_t)
 	}
-	return &errorMsg{messageInfo{ERROR, session}, code, message}
+	msg = &errorMsg{messageInfo{ERROR, session}, code, message}
+	return
 }
 
 func (msg *errorMsg) getPayload() []interface{} {
@@ -178,23 +188,29 @@ func (msg *errorMsg) getPayload() []interface{} {
 }
 
 // choke
-func unpackChoke(session int64, data []interface{}) *choke {
-	return &choke{messageInfo{CHOKE, session}}
+func unpackChoke(session int64, data []interface{}) (msg messageInterface, err error) {
+	msg = &choke{messageInfo{CHOKE, session}}
+	return
 }
 
 func (msg *choke) getPayload() []interface{} {
 	return []interface{}{}
 }
 
-// Common unpacker
-func unpackMessage(input []interface{}) messageInterface {
-	defer func() {
-		z := recover()
-		if z != nil {
-			fmt.Println("Error", z)
-		}
-	}()
+type unpacker func(int64, []interface{}) (messageInterface, error)
 
+var unpackers = map[int64]unpacker{
+	HANDSHAKE: unpackHandshake,
+	HEARTBEAT: unpackHeartbeat,
+	TERMINATE: unpackTerminate,
+	INVOKE:    unpackInvoke,
+	CHUNK:     unpackChunk,
+	ERROR:     unpackErrorMsg,
+	CHOKE:     unpackChoke,
+}
+
+// Common unpacker
+func unpackMessage(input []interface{}) (msg messageInterface, err error) {
 	var session int64
 
 	switch input[1].(type) {
@@ -204,26 +220,16 @@ func unpackMessage(input []interface{}) messageInterface {
 		session = input[1].(int64)
 	}
 
-	data := input[2].([]interface{})
+	unpacker, ok := unpackers[input[0].(int64)]
 
-	switch input[0].(int64) {
-	case HANDSHAKE:
-		return unpackHandshake(session, data)
-	case HEARTBEAT:
-		return unpackHeartbeat(session, data)
-	case TERMINATE:
-		return unpackTerminate(session, data)
-	case INVOKE:
-		return unpackInvoke(session, data)
-	case CHUNK:
-		return unpackChunk(session, data)
-	case ERROR:
-		return unpackErrorMsg(session, data)
-	case CHOKE:
-		return unpackChoke(session, data)
-	default:
-		panic("Invalid message")
+	if !ok {
+		err = fmt.Errorf("Invalid message type: %d", input[0].(int64))
 	}
+
+	data := input[2].([]interface{})
+	msg, err = unpacker(session, data)
+
+	return
 }
 
 type streamUnpacker struct {
@@ -241,7 +247,12 @@ func (unpacker *streamUnpacker) Feed(data []byte) []messageInterface {
 		if err != nil {
 			break
 		} else {
-			msgs = append(msgs, unpackMessage(res))
+			msg, err := unpackMessage(res)
+			if err != nil {
+				fmt.Printf("Error occured: %s", err)
+				continue
+			}
+			msgs = append(msgs, msg)
 			unpacker.buf = unpacker.buf[len(unpacker.buf)-tmp.Len():]
 		}
 
