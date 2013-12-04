@@ -1,7 +1,6 @@
 package cocaine
 
 import (
-	"sync"
 	"time"
 
 	"github.com/ugorji/go/codec"
@@ -36,7 +35,7 @@ func (err *ServiceError) Error() string {
 	return err.Message
 }
 
-func getServiceChanPair(stop <-chan int) (In chan ServiceResult, Out chan ServiceResult) {
+func getServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan ServiceResult) {
 	In = make(chan ServiceResult)
 	Out = make(chan ServiceResult)
 	finished := false
@@ -74,93 +73,12 @@ func getServiceChanPair(stop <-chan int) (In chan ServiceResult, Out chan Servic
 	return
 }
 
-/*
-Service's Finite-state Machine
-
-DISCONNECTED <-> CONNECTING -> CONNECTED
-
-CONNECTED -> DISCONNECTED
-
-*/
-
-type serviceFSM struct {
-	DISCONNECTED, CONNECTING, CONNECTED, CLOSED chan int
-	_TRUE                                       chan int // represents as close channel
-	_FALSE                                      chan int // represents as nil channel
-	sync.Mutex
-}
-
-func (fsm *serviceFSM) setConnected() {
-	fsm.Lock()
-	defer fsm.Unlock()
-	select {
-	case <-fsm.CONNECTED:
-		return
-	case <-fsm.CLOSED:
-		return
-	default:
-		fsm.DISCONNECTED, fsm.CONNECTING = fsm._FALSE, fsm._FALSE
-		fsm.CONNECTED = fsm._TRUE
-	}
-}
-
-func (fsm *serviceFSM) setDisconnected() {
-	fsm.Lock()
-	defer fsm.Unlock()
-	select {
-	case <-fsm.DISCONNECTED:
-		return
-	default:
-		fsm.CONNECTED, fsm.CONNECTING = fsm._FALSE, fsm._FALSE
-		fsm.DISCONNECTED = fsm._TRUE
-	}
-}
-
-func (fsm *serviceFSM) setConnecting() {
-	fsm.Lock()
-	defer fsm.Unlock()
-	select {
-	case <-fsm.CONNECTING:
-		return
-	default:
-		fsm.CONNECTED, fsm.DISCONNECTED = fsm._FALSE, fsm._FALSE
-		fsm.CONNECTING = fsm._TRUE
-	}
-}
-
-func (fsm *serviceFSM) setClosed() {
-	fsm.Lock()
-	defer fsm.Unlock()
-	select {
-	case <-fsm.CLOSED:
-		return
-	default:
-		fsm.CONNECTED, fsm.CONNECTING, fsm.DISCONNECTED = fsm._FALSE, fsm._FALSE, fsm._FALSE
-		fsm.CLOSED = fsm._TRUE
-	}
-}
-
-type ServiceInfo struct {
-	name string
-	args []interface{}
-}
-
-func (s *ServiceInfo) Name() string {
-	return s.name
-}
-
-func (s *ServiceInfo) ConnectionArgs() []interface{} {
-	return s.args
-}
-
 type Service struct {
 	sessions *keeperStruct
 	unpacker *streamUnpacker
-	mutex    sync.Mutex
-	serviceFSM
+	stop     chan bool
 	ResolveResult
 	socketIO
-	ServiceInfo
 }
 
 func NewService(name string, args ...interface{}) (s *Service, err error) {
@@ -174,85 +92,37 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 	if err != nil {
 		return
 	}
-	state := make(chan int)
-	close(state)
-	fsm := serviceFSM{_TRUE: state, CONNECTED: state}
 	s = &Service{
 		sessions:      newKeeperStruct(),
 		unpacker:      newStreamUnpacker(),
-		mutex:         sync.Mutex{},
-		serviceFSM:    fsm,
+		stop:          make(chan bool),
 		ResolveResult: info,
 		socketIO:      sock,
-		ServiceInfo:   ServiceInfo{name, args},
 	}
 	go s.loop()
 	return
 }
 
 func (service *Service) loop() {
-	for {
-		select {
-		case data, ok := <-service.socketIO.Read():
-			if !ok {
-				return
-			}
-			for _, item := range service.unpacker.Feed(data) {
-				switch msg := item.(type) {
-				case *chunk:
-					if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-						ch <- &serviceRes{msg.Data, nil}
-					}
-				case *choke:
-					if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-						service.sessions.Detach(msg.getSessionID())
-						close(ch)
-					}
-				case *errorMsg:
-					if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-						ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
-					}
+	for data := range service.socketIO.Read() {
+		for _, item := range service.unpacker.Feed(data) {
+			switch msg := item.(type) {
+			case *chunk:
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					ch <- &serviceRes{msg.Data, nil}
+				}
+			case *choke:
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					close(ch)
+					service.sessions.Detach(msg.getSessionID())
+				}
+			case *errorMsg:
+				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
+					ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
 				}
 			}
-		case <-service.CLOSED:
-			return
-		case <-service.DISCONNECTED:
-			return
 		}
 	}
-}
-
-func (service *Service) Reconnect(args ...interface{}) (err error) {
-	service.mutex.Lock()
-	defer service.mutex.Unlock()
-
-	select {
-	case <-service.CONNECTING:
-		return
-	default:
-		// Drop all old sessions. Send error to channels.
-		for _, key := range service.sessions.Keys() {
-			if ch, ok := service.sessions.Get(key); ok {
-				ch <- &serviceRes{nil, &ServiceError{-32, "Connection has broken"}}
-				service.sessions.Detach(key)
-				close(ch)
-			}
-		}
-		var swapCandidate *Service
-		if len(args) > 0 {
-			swapCandidate, err = NewService(service.Name(), args...)
-		} else {
-			swapCandidate, err = NewService(service.Name(), service.ConnectionArgs()...)
-		}
-		if err != nil {
-			service.serviceFSM.setDisconnected()
-			return
-		}
-		service.Close()
-		service = swapCandidate
-
-	}
-	return
 }
 
 func (service *Service) Call(name string, args ...interface{}) chan ServiceResult {
@@ -262,7 +132,7 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 		errorOut <- &serviceRes{nil, &ServiceError{-100, "Wrong method name"}}
 		return errorOut
 	}
-	in, out := getServiceChanPair(service.serviceFSM.CLOSED)
+	in, out := getServiceChanPair(service.stop)
 	id := service.sessions.Attach(in)
 	msg := ServiceMethod{messageInfo{method, id}, args}
 	service.socketIO.Write() <- packMsg(&msg)
@@ -270,12 +140,6 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 }
 
 func (service *Service) Close() {
-	service.mutex.Lock()
-	defer service.mutex.Unlock()
-	select {
-	case <-service.CLOSED: // Service has been already closed
-	default:
-		service.serviceFSM.setClosed() // Broadcast all related goroutines about disposing
-		service.socketIO.Close()
-	}
+	close(service.stop) // Broadcast all related goroutines about disposing
+	service.socketIO.Close()
 }

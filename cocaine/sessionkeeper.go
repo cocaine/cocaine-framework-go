@@ -34,12 +34,3 @@ func (keeper *keeperStruct) Get(id int64) (ch chan ServiceResult, ok bool) {
 	ch, ok = keeper.links[id]
 	return
 }
-
-func (keeper *keeperStruct) Keys() (keys []int64) {
-	defer keeper.RUnlock()
-	keeper.RLock()
-	for key := range keeper.links {
-		keys = append(keys, key)
-	}
-	return
-}
