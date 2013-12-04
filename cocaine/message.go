@@ -112,7 +112,7 @@ func unpackHandshake(session int64, data []interface{}) (msg messageInterface, e
 }
 
 func (msg *handshakeStruct) getPayload() []interface{} {
-	return []interface{}{msg.Uuid}
+	return []interface{}{msg.Uuid.String()}
 }
 
 // heartbeat
