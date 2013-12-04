@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
 
@@ -139,7 +140,7 @@ func (response *Response) ErrorMsg(code int, msg string) {
 // and cocaine-runtime. Dispatch incoming messages from runtime.
 type Worker struct {
 	unpacker        *streamUnpacker
-	uuid            string
+	uuid            uuid.UUID
 	logger          *Logger
 	heartbeat_timer *time.Timer
 	disown_timer    *time.Timer
@@ -160,9 +161,11 @@ func NewWorker() (worker *Worker, err error) {
 		return
 	}
 
+	worker_uuid, _ := uuid.FromString(flag_uuid)
+
 	w := Worker{
 		unpacker:        newStreamUnpacker(),
-		uuid:            flag_uuid,
+		uuid:            worker_uuid,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
