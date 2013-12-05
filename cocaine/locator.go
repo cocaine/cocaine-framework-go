@@ -44,7 +44,7 @@ type Locator struct {
 }
 
 func NewLocator(args ...interface{}) (*Locator, error) {
-	var endpoint string = "localhost:10053"
+	endpoint := "localhost:10053"
 
 	if len(args) == 1 {
 		if _endpoint, ok := args[0].(string); ok {
