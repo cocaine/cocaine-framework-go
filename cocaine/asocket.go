@@ -26,16 +26,19 @@ type socketWriter interface {
 type asyncBuff struct {
 	in, out chan rawMessage
 	stop    chan bool
+	wg      sync.WaitGroup
 }
 
 func newAsyncBuf() *asyncBuff {
-	buf := asyncBuff{make(chan rawMessage), make(chan rawMessage), make(chan bool, 1)}
+	buf := asyncBuff{make(chan rawMessage), make(chan rawMessage), make(chan bool, 1), sync.WaitGroup{}}
 	buf.loop()
 	return &buf
 }
 
 func (bf *asyncBuff) loop() {
 	go func() {
+		bf.wg.Add(1)
+		defer bf.wg.Done()
 		var pending []rawMessage // data buffer
 		var _in chan rawMessage  // incoming channel
 		_in = bf.in
@@ -71,6 +74,7 @@ func (bf *asyncBuff) loop() {
 
 func (bf *asyncBuff) Stop() (res bool) {
 	close(bf.stop)
+	bf.wg.Wait()
 	return
 }
 
@@ -96,10 +100,9 @@ func newAsyncRWSocket(family string, address string, timeout time.Duration) (*as
 }
 
 func (sock *asyncRWSocket) Close() {
-	sock.close()
 	sock.clientToSock.Stop()
 	sock.socketToClient.Stop()
-	sock.Conn.Close()
+	sock.close()
 }
 
 func (sock *asyncRWSocket) close() {
@@ -109,6 +112,7 @@ func (sock *asyncRWSocket) close() {
 	case <-sock.closed: // Already closed
 	default:
 		close(sock.closed)
+		sock.Conn.Close()
 	}
 }
 
@@ -184,7 +188,6 @@ func (sock *asyncWSocket) close() {
 	select {
 	case <-sock.closed: // Already closed
 	default:
-		log.Println("Change state")
 		close(sock.closed)
 		sock.Conn.Close()
 	}
@@ -217,7 +220,6 @@ func (sock *asyncWSocket) readloop() {
 		for {
 			_, err := sock.Conn.Read(buf)
 			if err != nil {
-				log.Println("Disconnected")
 				sock.close()
 				return
 			}
