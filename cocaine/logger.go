@@ -28,10 +28,10 @@ func NewLogger(args ...interface{}) (logger *Logger, err error) {
 
 	res := <-temp.Call("verbosity")
 	if res.Err() != nil {
-		err = errors.New("Unable to receive verbosity")
+		err = errors.New("cocaine: unable to receive verbosity")
 		return
 	}
-	var verbosity int = 0
+	verbosity := 0
 	if err = res.Extract(&verbosity); err != nil {
 		return
 	}
@@ -48,7 +48,7 @@ func NewLogger(args ...interface{}) (logger *Logger, err error) {
 
 // Blocked
 func (logger *Logger) log(level int64, message ...interface{}) bool {
-	msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
+	msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flagApp), fmt.Sprint(message...)}}
 	logger.Write() <- packMsg(&msg)
 	return true
 }

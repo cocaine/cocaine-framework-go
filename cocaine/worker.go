@@ -11,17 +11,17 @@ import (
 )
 
 var (
-	flag_uuid     string
-	flag_endpoint string
-	flag_app      string
-	flag_locator  string
+	flagUUID     string
+	flagEndpoint string
+	flagApp      string
+	flagLocator  string
 )
 
 func init() {
-	flag.StringVar(&flag_uuid, "uuid", "", "UUID")
-	flag.StringVar(&flag_endpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&flag_app, "app", "standalone", "Connection path")
-	flag.StringVar(&flag_locator, "locator", "", "Connection path")
+	flag.StringVar(&flagUUID, "uuid", "", "UUID")
+	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
+	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
+	flag.StringVar(&flagLocator, "locator", "", "Connection path")
 	flag.Parse()
 }
 
@@ -151,7 +151,7 @@ type Worker struct {
 
 // Create new instance of Worker. Return error on fail.
 func NewWorker() (worker *Worker, err error) {
-	sock, err := newAsyncRWSocket("unix", flag_endpoint, time.Second*5)
+	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
 	if err != nil {
 		return
 	}
@@ -161,11 +161,11 @@ func NewWorker() (worker *Worker, err error) {
 		return
 	}
 
-	worker_uuid, _ := uuid.FromString(flag_uuid)
+	workerID, _ := uuid.FromString(flagUUID)
 
 	w := Worker{
 		unpacker:        newStreamUnpacker(),
-		uuid:            worker_uuid,
+		uuid:            workerID,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),

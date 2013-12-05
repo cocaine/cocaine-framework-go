@@ -160,8 +160,8 @@ func (msg *invoke) getPayload() []interface{} {
 
 // chunk
 func unpackChunk(session int64, data []interface{}) (msg messageInterface, err error) {
-	msg_data := data[0].([]byte)
-	msg = &chunk{messageInfo{CHUNK, session}, msg_data}
+	msgData := data[0].([]byte)
+	msg = &chunk{messageInfo{CHUNK, session}, msgData}
 	return
 }
 
@@ -223,7 +223,7 @@ func unpackMessage(input []interface{}) (msg messageInterface, err error) {
 	unpacker, ok := unpackers[input[0].(int64)]
 
 	if !ok {
-		err = fmt.Errorf("Invalid message type: %d", input[0].(int64))
+		err = fmt.Errorf("cocaine: invalid message type: %d", input[0].(int64))
 	}
 
 	data := input[2].([]interface{})
