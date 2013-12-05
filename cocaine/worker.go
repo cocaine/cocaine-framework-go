@@ -3,25 +3,25 @@ package cocaine
 import (
 	"flag"
 	"fmt"
-	"os"
 	"runtime/debug"
 	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
 )
 
 var (
-	flag_uuid     string
-	flag_endpoint string
-	flag_app      string
-	flag_locator  string
+	flagUUID     string
+	flagEndpoint string
+	flagApp      string
+	flagLocator  string
 )
 
 func init() {
-	flag.StringVar(&flag_uuid, "uuid", "", "UUID")
-	flag.StringVar(&flag_endpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&flag_app, "app", "standalone", "Connection path")
-	flag.StringVar(&flag_locator, "locator", "", "Connection path")
+	flag.StringVar(&flagUUID, "uuid", "", "UUID")
+	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
+	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
+	flag.StringVar(&flagLocator, "locator", "", "Connection path")
 	flag.Parse()
 }
 
@@ -140,7 +140,7 @@ func (response *Response) ErrorMsg(code int, msg string) {
 // and cocaine-runtime. Dispatch incoming messages from runtime.
 type Worker struct {
 	unpacker        *streamUnpacker
-	uuid            string
+	uuid            uuid.UUID
 	logger          *Logger
 	heartbeat_timer *time.Timer
 	disown_timer    *time.Timer
@@ -151,7 +151,7 @@ type Worker struct {
 
 // Create new instance of Worker. Return error on fail.
 func NewWorker() (worker *Worker, err error) {
-	sock, err := newAsyncRWSocket("unix", flag_endpoint, time.Second*5)
+	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
 	if err != nil {
 		return
 	}
@@ -161,9 +161,11 @@ func NewWorker() (worker *Worker, err error) {
 		return
 	}
 
+	workerID, _ := uuid.FromString(flagUUID)
+
 	w := Worker{
 		unpacker:        newStreamUnpacker(),
-		uuid:            flag_uuid,
+		uuid:            workerID,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
@@ -226,11 +228,11 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 					worker.disown_timer.Stop()
 
 				case *terminateStruct:
-					worker.logger.Debug("Receive terminate")
-					os.Exit(0)
+					worker.logger.Info("Receive terminate")
+					return
 
 				default:
-					worker.logger.Debug("Unknown message")
+					worker.logger.Warn("Unknown message")
 				}
 			}
 		case <-worker.heartbeat_timer.C:
@@ -238,7 +240,8 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			worker.heartbeat()
 
 		case <-worker.disown_timer.C:
-			worker.logger.Debug("Disowned")
+			worker.logger.Info("Disowned")
+			return
 
 		case outcoming := <-worker.from_handlers:
 			worker.Write() <- outcoming

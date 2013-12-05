@@ -31,9 +31,10 @@ func createTempService(args ...interface{}) (endpoint string, verbosity int, err
 
 	res := <-temp.Call("verbosity")
 	if res.Err() != nil {
-		err = fmt.Errorf("%s", "Unable to receive verbosity")
+		err = fmt.Errorf("%s", "cocaine: unable to receive verbosity")
 		return
 	}
+	verbosity = 0
 	if err = res.Extract(&verbosity); err != nil {
 		return
 	}
@@ -109,7 +110,7 @@ func (logger *Logger) log(level int64, message ...interface{}) bool {
 				return false
 			}
 		default:
-			msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flag_app), fmt.Sprint(message...)}}
+			msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flagApp), fmt.Sprint(message...)}}
 			logger.Write() <- packMsg(&msg)
 			return true
 		}

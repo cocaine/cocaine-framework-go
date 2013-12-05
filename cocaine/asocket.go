@@ -149,11 +149,10 @@ func (sock *asyncRWSocket) readloop() {
 				close(sock.socketToClient.in)
 				sock.close()
 				return
-			} else {
-				bufferToSend := make([]byte, count)
-				copy(bufferToSend[:], buf[:count])
-				sock.socketToClient.in <- bufferToSend
 			}
+			bufferToSend := make([]byte, count)
+			copy(bufferToSend[:], buf[:count])
+			sock.socketToClient.in <- bufferToSend
 		}
 	}()
 }
