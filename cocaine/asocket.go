@@ -2,17 +2,24 @@ package cocaine
 
 import (
 	"net"
+	"sync"
 	"time"
+
+	"log"
 )
+
+var _ = log.Println
 
 type socketIO interface {
 	Read() chan rawMessage
 	Write() chan rawMessage
+	IsClosed() <-chan struct{}
 	Close()
 }
 
 type socketWriter interface {
 	Write() chan rawMessage
+	IsClosed() <-chan struct{}
 	Close()
 }
 
@@ -70,9 +77,10 @@ func (bf *asyncBuff) Stop() (res bool) {
 // Biderectional socket
 type asyncRWSocket struct {
 	net.Conn
-	closed         chan bool
 	clientToSock   *asyncBuff
 	socketToClient *asyncBuff
+	closed         chan struct{} //broadcast channel
+	mutex          sync.Mutex
 }
 
 func newAsyncRWSocket(family string, address string, timeout time.Duration) (*asyncRWSocket, error) {
@@ -81,17 +89,31 @@ func newAsyncRWSocket(family string, address string, timeout time.Duration) (*as
 		return nil, err
 	}
 
-	sock := asyncRWSocket{conn, make(chan bool), newAsyncBuf(), newAsyncBuf()}
+	sock := asyncRWSocket{conn, newAsyncBuf(), newAsyncBuf(), make(chan struct{}), sync.Mutex{}}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
 }
 
 func (sock *asyncRWSocket) Close() {
-	close(sock.closed)
+	sock.close()
 	sock.clientToSock.Stop()
 	sock.socketToClient.Stop()
 	sock.Conn.Close()
+}
+
+func (sock *asyncRWSocket) close() {
+	sock.mutex.Lock()
+	defer sock.mutex.Unlock()
+	select {
+	case <-sock.closed: // Already closed
+	default:
+		close(sock.closed)
+	}
+}
+
+func (sock *asyncRWSocket) IsClosed() (broadcast <-chan struct{}) {
+	return sock.closed
 }
 
 func (sock *asyncRWSocket) Write() chan rawMessage {
@@ -107,6 +129,7 @@ func (sock *asyncRWSocket) writeloop() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
+				sock.close()
 				return
 			}
 		}
@@ -120,6 +143,7 @@ func (sock *asyncRWSocket) readloop() {
 			count, err := sock.Conn.Read(buf)
 			if err != nil {
 				close(sock.socketToClient.in)
+				sock.close()
 				return
 			} else {
 				bufferToSend := make([]byte, count)
@@ -133,8 +157,9 @@ func (sock *asyncRWSocket) readloop() {
 // WriteOnly Socket
 type asyncWSocket struct {
 	net.Conn
-	state        chan bool
 	clientToSock *asyncBuff
+	closed       chan struct{} //broadcast channel
+	mutex        sync.Mutex
 }
 
 func newWSocket(family string, address string, timeout time.Duration) (*asyncWSocket, error) {
@@ -143,7 +168,7 @@ func newWSocket(family string, address string, timeout time.Duration) (*asyncWSo
 		return nil, err
 	}
 
-	sock := asyncWSocket{conn, make(chan bool), newAsyncBuf()}
+	sock := asyncWSocket{conn, newAsyncBuf(), make(chan struct{}), sync.Mutex{}}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
@@ -153,9 +178,25 @@ func (sock *asyncWSocket) Write() chan rawMessage {
 	return sock.clientToSock.in
 }
 
+func (sock *asyncWSocket) close() {
+	sock.mutex.Lock() // Is it really necessary???
+	defer sock.mutex.Unlock()
+	select {
+	case <-sock.closed: // Already closed
+	default:
+		log.Println("Change state")
+		close(sock.closed)
+		sock.Conn.Close()
+	}
+}
+
 func (sock *asyncWSocket) Close() {
-	sock.Conn.Close()
+	sock.close()
 	sock.clientToSock.Stop()
+}
+
+func (sock *asyncWSocket) IsClosed() (broadcast <-chan struct{}) {
+	return sock.closed
 }
 
 func (sock *asyncWSocket) writeloop() {
@@ -163,6 +204,7 @@ func (sock *asyncWSocket) writeloop() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
+				sock.close()
 				return
 			}
 		}
@@ -175,6 +217,8 @@ func (sock *asyncWSocket) readloop() {
 		for {
 			_, err := sock.Conn.Read(buf)
 			if err != nil {
+				log.Println("Disconnected")
+				sock.close()
 				return
 			}
 		}

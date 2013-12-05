@@ -60,11 +60,6 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 }
 
 func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		log.Println("defer", err)
-	// 	}
-	// }()
 	var res ResolveResult
 	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
 	if err != nil {
