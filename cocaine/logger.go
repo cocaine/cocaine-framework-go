@@ -20,7 +20,11 @@ const (
 )
 
 func NewLogger(args ...interface{}) (logger *Logger, err error) {
-	temp, err := NewService("logging", args...)
+	return NewLoggerWithName("logging", args...)
+}
+
+func NewLoggerWithName(loggerName string, args ...interface{}) (logger *Logger, err error) {
+	temp, err := NewService(loggerName, args...)
 	if err != nil {
 		return
 	}
