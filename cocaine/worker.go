@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"time"
+	"os"
 
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
@@ -229,7 +230,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 				case *terminateStruct:
 					worker.logger.Info("Receive terminate")
-					return
+					os.Exit(0)
 
 				default:
 					worker.logger.Warn("Unknown message")
@@ -241,7 +242,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 		case <-worker.disown_timer.C:
 			worker.logger.Info("Disowned")
-			return
+			os.Exit(0)
 
 		case outcoming := <-worker.from_handlers:
 			worker.Write() <- outcoming
