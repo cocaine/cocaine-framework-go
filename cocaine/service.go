@@ -16,11 +16,14 @@ type serviceRes struct {
 	err error
 }
 
+//Unpacks the result of the called method in the passed structure.
+//You can transfer the structure of a particular type that will avoid the type checking. Look at examples.
 func (s *serviceRes) Extract(target interface{}) (err error) {
 	err = codec.NewDecoderBytes(s.res, h).Decode(&target)
 	return
 }
 
+//Error status
 func (s *serviceRes) Err() error {
 	return s.err
 }
@@ -73,6 +76,7 @@ func getServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan Servi
 	return
 }
 
+//Allows you to invoke methods of services and send events to other cloud applications.
 type Service struct {
 	sessions *keeperStruct
 	unpacker *streamUnpacker
@@ -81,6 +85,8 @@ type Service struct {
 	socketIO
 }
 
+//Creates new service instance with specifed name.
+//Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
 func NewService(name string, args ...interface{}) (s *Service, err error) {
 	l, err := NewLocator(args...)
 	if err != nil {
@@ -119,6 +125,7 @@ func (service *Service) loop() {
 	}
 }
 
+//Calls a remote method by name and pass args
 func (service *Service) Call(name string, args ...interface{}) chan ServiceResult {
 	method, err := service.getMethodNumber(name)
 	if err != nil {
@@ -133,6 +140,7 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 	return out
 }
 
+//Disposes resources of a service. You must call this method if the service isn't used anymore.
 func (service *Service) Close() {
 	close(service.stop) // Broadcast all related goroutines about disposing
 	service.socketIO.Close()

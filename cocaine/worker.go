@@ -3,9 +3,9 @@ package cocaine
 import (
 	"flag"
 	"fmt"
+	"os"
 	"runtime/debug"
 	"time"
-	"os"
 
 	"github.com/satori/go.uuid"
 	"github.com/ugorji/go/codec"
@@ -119,7 +119,7 @@ func newResponse(session int64, to_worker chan rawMessage) *Response {
 	return &response
 }
 
-// Send chunk of data to a client.
+// Sends chunk of data to a client.
 func (response *Response) Write(data interface{}) {
 	var res []byte
 	codec.NewEncoderBytes(&res, h).Encode(&data)
@@ -137,8 +137,8 @@ func (response *Response) ErrorMsg(code int, msg string) {
 	response.from_handler <- packMsg(&errorMsg{messageInfo{ERROR, response.session}, code, msg})
 }
 
-// Worker struct performs IO operations between application
-// and cocaine-runtime. Dispatch incoming messages from runtime.
+// Performs IO operations between application
+// and cocaine-runtime, dispatches incoming messages from runtime.
 type Worker struct {
 	unpacker        *streamUnpacker
 	uuid            uuid.UUID
@@ -150,7 +150,7 @@ type Worker struct {
 	socketIO
 }
 
-// Create new instance of Worker. Return error on fail.
+// Creates new instance of Worker. Returns error on fail.
 func NewWorker() (worker *Worker, err error) {
 	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
 	if err != nil {
@@ -181,7 +181,7 @@ func NewWorker() (worker *Worker, err error) {
 	return
 }
 
-// Initialize worker in runtime as starting. Launch eventloop.
+// Initializes worker in runtime as starting. Launchs an eventloop.
 func (worker *Worker) Loop(bind map[string]EventHandler) {
 	for {
 		select {
