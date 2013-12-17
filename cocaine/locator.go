@@ -48,7 +48,7 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
-	endpoint := flag.flagLocator
+	endpoint := flagLocator
 
 	if len(args) == 1 {
 		if _endpoint, ok := args[0].(string); ok {
