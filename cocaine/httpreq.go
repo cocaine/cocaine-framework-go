@@ -5,6 +5,7 @@ import (
 	"github.com/ugorji/go/codec"
 	"net/http"
 	"reflect"
+	"fmt"
 )
 
 type Headers [][2]string
@@ -56,4 +57,102 @@ func CocaineHeaderToHttpHeader(hdr Headers) http.Header {
 		header.Add(hdrValues[0], hdrValues[1])
 	}
 	return header
+}
+
+// WrapHandler provides opportunity for using Go web frameworks, which supports http.Handler interface
+//
+//  Trivial example which is used martini web framework
+//
+//	import (
+//		"github.com/cocaine/cocaine-framework-go/cocaine"
+//		"github.com/codegangsta/martini"
+//	)
+//
+//
+//	func main() {
+//		m := martini.Classic()
+//		m.Get("", func() string {
+//				return "This is an example server"
+//			})
+//
+//		m.Get("/hw", func() string {
+//				return "Hello world!"
+//			})
+//
+//		binds := map[string]cocaine.EventHandler{
+//			"example": cocaine.WrapHandler(m, nil),
+//		}
+//		if worker, err := cocaine.NewWorker(); err == nil{
+//			worker.Loop(binds)
+//		}else{
+//			panic(err)
+//		}
+//	}
+//
+func WrapHandler(handler http.Handler, logger *Logger) EventHandler {
+	var err error
+	if logger == nil {
+		logger, err = NewLogger()
+		if err != nil {
+			panic(fmt.Sprintf("Could not initialize logger due to error: %v", err))
+		}
+	}
+	var wrapper = func (request *Request, response *Response) {
+		if httpRequest, err := UnpackProxyRequest(<-request.Read()); err != nil {
+			logger.Errf("Could not unpack http request due to error %v", err)
+			response.Write(WriteHead(400, Headers{}))
+		} else {
+			w := &ResponseWriter{
+				cRes: response,
+				req: httpRequest,
+				handlerHeader: make(http.Header),
+				contentLength: -1,
+				wroteHeader: false,
+				logger: logger,
+
+			}
+			handler.ServeHTTP(w, httpRequest)
+			w.finishRequest()
+		}
+		response.Close()
+	}
+
+	return wrapper
+}
+
+// WrapHandlerFunc provides opportunity for using Go web frameworks, which supports http.HandlerFunc interface
+//
+//  Trivial example is
+//
+//	import (
+//		"net/http"
+//		"github.com/cocaine/cocaine-framework-go/cocaine"
+//	)
+//
+//	func handler(w http.ResponseWriter, req *http.Request) {
+//		w.Header().Set("Content-Type", "text/plain")
+//		w.Write([]byte("This is an example server.\n"))
+//	}
+//
+//	func main() {
+//		binds := map[string]cocaine.EventHandler{
+//			"example": cocaine.WrapHandlerFunc(handler, nil),
+//		}
+//		if worker, err := cocaine.NewWorker(); err == nil{
+//			worker.Loop(binds)
+//		}else{
+//			panic(err)
+//		}
+//	}
+//
+func WrapHandlerFunc(hf http.HandlerFunc, logger *Logger) EventHandler {
+	return WrapHandler(http.HandlerFunc(hf), logger)
+}
+
+func WrapHandleFuncs(hfs map[string]http.HandlerFunc, logger *Logger) (handlers map[string]EventHandler) {
+	handlers = map[string]EventHandler{}
+	for key, hf := range(hfs){
+		handlers[key] = WrapHandlerFunc(hf, logger)
+	}
+	return
 }
