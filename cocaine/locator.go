@@ -2,6 +2,7 @@ package cocaine
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -44,7 +45,10 @@ type Locator struct {
 }
 
 func NewLocator(args ...interface{}) (*Locator, error) {
-	endpoint := "localhost:10053"
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	endpoint := flagLocator
 
 	if len(args) == 1 {
 		if _endpoint, ok := args[0].(string); ok {
@@ -60,11 +64,6 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 }
 
 func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		log.Println("defer", err)
-	// 	}
-	// }()
 	var res ResolveResult
 	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
 	if err != nil {

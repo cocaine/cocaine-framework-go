@@ -23,7 +23,6 @@ func init() {
 	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
 	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
 	flag.StringVar(&flagLocator, "locator", "", "Connection path")
-	flag.Parse()
 }
 
 const (
@@ -152,6 +151,7 @@ type Worker struct {
 
 // Creates new instance of Worker. Returns error on fail.
 func NewWorker() (worker *Worker, err error) {
+	flag.Parse()
 	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
 	if err != nil {
 		return
