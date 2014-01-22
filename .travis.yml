@@ -12,4 +12,4 @@ before_install:
   - sudo pip install cocaine
 
 script:
-  - go build github.com/cocaine/cocaine-framework-go/testapp
+  - go build -o SOMETEST github.com/cocaine/cocaine-framework-go/testapp
