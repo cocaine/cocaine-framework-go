@@ -5,8 +5,10 @@ import (
 )
 
 type Storage interface {
-	//Read(namespace string, key string) ([]byte, error)
 	Find(namespace string, tags []string) ([]string, error)
+	Read(namespace string, key string) (string, error)
+	Write(namespace string, key string, tags []string) error
+	Remove(namespace string, key string) error
 }
 
 type storage struct {
@@ -29,5 +31,27 @@ func (s *storage) Find(namespace string, tags []string) (keys []string, err erro
 		return
 	}
 	res.Extract(&keys)
+	return
+}
+
+func (s *storage) Read(namespace string, key string) (blob string, err error) {
+	res := <-s.s.Call("read", namespace, key)
+	err = res.Err()
+	if err != nil {
+		return
+	}
+	res.Extract(&blob)
+	return
+}
+
+func (s *storage) Write(namespace string, key string, tags []string) (err error) {
+	res := <-s.s.Call("write", namespace, key, tags)
+	err = res.Err()
+	return
+}
+
+func (s *storage) Remove(namespace string, key string) (err error) {
+	res := <-s.s.Call("remove", namespace, key)
+	err = res.Err()
 	return
 }

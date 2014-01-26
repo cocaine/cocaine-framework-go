@@ -36,4 +36,7 @@ func TestStorageRead(t *testing.T) {
 	key := "a"
 	b, err := s.Read(namespace, key)
 	t.Logf("%s", b)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
