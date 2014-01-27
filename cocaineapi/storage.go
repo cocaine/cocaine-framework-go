@@ -7,7 +7,7 @@ import (
 type Storage interface {
 	Find(namespace string, tags []string) ([]string, error)
 	Read(namespace string, key string) (string, error)
-	Write(namespace string, key string, tags []string) error
+	Write(namespace string, key string, blob string, tags []string) error
 	Remove(namespace string, key string) error
 }
 
@@ -44,14 +44,18 @@ func (s *storage) Read(namespace string, key string) (blob string, err error) {
 	return
 }
 
-func (s *storage) Write(namespace string, key string, tags []string) (err error) {
-	res := <-s.s.Call("write", namespace, key, tags)
-	err = res.Err()
+func (s *storage) Write(namespace string, key string, blob string, tags []string) (err error) {
+	res, opened := <-s.s.Call("write", namespace, key, blob, tags)
+	if opened {
+		err = res.Err()
+	}
 	return
 }
 
 func (s *storage) Remove(namespace string, key string) (err error) {
-	res := <-s.s.Call("remove", namespace, key)
-	err = res.Err()
+	res, opened := <-s.s.Call("remove", namespace, key)
+	if opened {
+		err = res.Err()
+	}
 	return
 }
