@@ -3,13 +3,5 @@ language: go
 go:
   - 1.2
 
-before_install:
-  - echo 'deb http://repo.reverbrain.com/precise current/amd64/' | sudo tee -a /etc/apt/sources.list
-  - sudo apt-get update -qq
-  - sudo apt-get install libmsgpack-dev
-  - sudo apt-get install python-pip
-  - sudo pip install cocaine-tools
-  - sudo pip install cocaine
-
 script:
   - go build -o SOMETEST github.com/cocaine/cocaine-framework-go/testapp
