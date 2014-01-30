@@ -10,8 +10,6 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-const DEFAULT_LOCATOR_PORT = 10053
-
 type Endpoint struct {
 	Host string
 	Port int

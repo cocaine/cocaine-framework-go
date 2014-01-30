@@ -22,7 +22,7 @@ func init() {
 	flag.StringVar(&flagUUID, "uuid", "", "UUID")
 	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
 	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
-	flag.StringVar(&flagLocator, "locator", "", "Connection path")
+	flag.StringVar(&flagLocator, "locator", "localhost:10053", "Connection path")
 }
 
 const (
