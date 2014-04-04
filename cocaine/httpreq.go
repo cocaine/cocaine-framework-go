@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"reflect"
 	"fmt"
+	"compress/gzip"
+	"io"
+	"errors"
 )
 
 type Headers [][2]string
@@ -34,6 +37,12 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 	if xRealIp := r.Header.Get("X-Real-IP"); xRealIp != "" {
 		r.RemoteAddr = xRealIp
 	}
+
+	err = decompressBody(r)
+	if err != nil {
+		return nil, err
+	}
+
 	return r, nil
 }
 
@@ -154,5 +163,48 @@ func WrapHandleFuncs(hfs map[string]http.HandlerFunc, logger *Logger) (handlers 
 	for key, hf := range(hfs){
 		handlers[key] = WrapHandlerFunc(hf, logger)
 	}
+	return
+}
+
+// By default decompressors such as gzip do not close underlying stream
+// so we need to close it manually. This decorator makes it
+type decompressReaderCloser struct {
+	decompressReader io.Closer
+	body io.Closer
+}
+
+func (this decompressReaderCloser) Close() error {
+	errDec := this.decompressReader.Close()
+	errBody := this.body.Close()
+
+	if errDec != nil {
+		return errDec
+	} else {
+		return errBody
+	}
+}
+
+type readerAndCloser struct {
+	io.Reader
+	io.Closer
+}
+
+// If body is compressed it will be decompressed
+// Currently only gzip supported
+func decompressBody(req *http.Request) (err error) {
+	if req.ContentLength > 0 && req.Header.Get("Content-Encoding") == "gzip" {
+		gzReader, zerr := gzip.NewReader(req.Body)
+		if zerr == nil {
+			req.Header.Del("Content-Encoding")
+			req.Header.Del("Content-Length")
+			req.ContentLength = -1
+			req.Body = readerAndCloser{gzReader, decompressReaderCloser{gzReader, req.Body}}
+		} else {
+			gzReader.Close()
+			req.Body.Close()
+			err = errors.New(fmt.Sprintf("Could not decompress gzip body due to error %v", zerr))
+		}
+	}
+
 	return
 }
