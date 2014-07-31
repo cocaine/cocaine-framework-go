@@ -34,6 +34,38 @@ func main() {
 
 ```
 
+This is an example of using go web frameworks:
+
+```
+package main
+
+import (
+	"github.com/cocaine/cocaine-framework-go/cocaine"
+	"github.com/codegangsta/martini"
+)
+
+
+func main() {
+	m := martini.Classic()
+	m.Get("", func() string {
+			return "This is an example server"
+		})
+
+	m.Get("/hw", func() string {
+			return "Hello world!"
+		})
+
+	binds := map[string]cocaine.EventHandler{
+		"example": cocaine.WrapHandler(m, nil),
+	}
+	if worker, err := cocaine.NewWorker(); err == nil{
+		worker.Loop(binds)
+	}else{
+		panic(err)
+	}
+}
+```
+
 ## Installation
 ```
 go get github.com/cocaine/cocaine-framework-go/cocaine
