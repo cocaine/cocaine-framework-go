@@ -142,7 +142,7 @@ func (sock *asyncRWSocket) writeloop() {
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		buf := make([]byte, 2048)
+		buf := make([]byte, 65536)
 		for {
 			count, err := sock.Conn.Read(buf)
 			if err != nil {
