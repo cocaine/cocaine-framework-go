@@ -1,44 +1,80 @@
 package cocaine
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"log"
+	"net"
 	"time"
-
-	"github.com/ugorji/go/codec"
 )
 
-type Endpoint struct {
-	Host string
-	Port int
+// General message information
+type Message struct {
+	// Session id
+	Session uint64
+	// Message type number
+	MsgType uint64
 }
 
-func (endpoint *Endpoint) AsString() string {
-	return fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+type GeneralMessage struct {
+	Message
+	Payload []interface{}
 }
 
 type ResolveResult struct {
-	success  bool
-	Endpoint `codec:",omitempty"`
-	Version  int
-	API      map[int64]string
+	Endpoints []EndpointItem
+	Version   uint64
+	API       DispatchMap
 }
 
-func (r *ResolveResult) getMethodNumber(name string) (number int64, err error) {
-	for key, value := range r.API {
-		if value == name {
-			number = key
-			return
+type ResolveChannelResult struct {
+	*ResolveResult
+	Err error
+}
+
+// Description of service endpoint
+// It consists of ("IP", Port)
+type EndpointItem struct {
+	//Service ip address
+	IP string
+	//Service port
+	Port uint64
+}
+
+func (e *EndpointItem) String() string {
+	return net.JoinHostPort(e.IP, fmt.Sprintf("%d", e.Port))
+}
+
+type StreamStruct map[uint64]struct {
+	Name string
+	*StreamStruct
+}
+
+type DispatchItem struct {
+	Name       string
+	Downstream StreamStruct
+	Upstream   StreamStruct
+}
+
+type DispatchMap map[uint64]DispatchItem
+
+func (d *DispatchMap) Methods() []string {
+	var methods []string = make([]string, 0)
+	for _, v := range *d {
+		methods = append(methods, v.Name)
+	}
+	return methods
+}
+
+func (d *DispatchMap) MethodByName(name string) (uint64, error) {
+	for i, v := range *d {
+		if v.Name == name {
+			return i, nil
 		}
 	}
-	err = errors.New("Missing method")
-	return
+	return 0, fmt.Errorf("no method `%s`", name)
 }
 
 type Locator struct {
-	unpacker *streamUnpacker
 	socketIO
 }
 
@@ -58,40 +94,23 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Locator{newStreamUnpacker(), sock}, nil
+	return &Locator{
+		socketIO: sock,
+	}, nil
 }
 
-func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
-	var res ResolveResult
-	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
-	if err != nil {
-		log.Println("unpack chunk error", err)
-	}
-	return res
-}
-
-func (locator *Locator) Resolve(name string) chan ResolveResult {
-	Out := make(chan ResolveResult)
+func (locator *Locator) Resolve(name string) <-chan ResolveChannelResult {
+	Out := make(chan ResolveChannelResult, 1)
 	go func() {
 		var resolveresult ResolveResult
-		resolveresult.success = false
-		msg := ServiceMethod{messageInfo{0, 0}, []interface{}{name}}
-		locator.socketIO.Write() <- packMsg(&msg)
-		closed := false
-		for !closed {
-			answer := <-locator.socketIO.Read()
-			msgs := locator.unpacker.Feed(answer)
-			for _, item := range msgs {
-				switch id := item.getTypeID(); id {
-				case CHUNK:
-					resolveresult = locator.unpackchunk(item.getPayload()[0].([]byte))
-					resolveresult.success = true
-				case CHOKE:
-					closed = true
-				}
-			}
+		locator.socketIO.Write() <- GeneralMessage{Message{1, 0}, []interface{}{name}}
+		answer := <-locator.socketIO.Read()
+		// ToDO: Optimize converter like in `mapstructure`
+		convertPayload(answer.Payload, &resolveresult)
+		Out <- ResolveChannelResult{
+			ResolveResult: &resolveresult,
+			Err:           nil,
 		}
-		Out <- resolveresult
 	}()
 	return Out
 }

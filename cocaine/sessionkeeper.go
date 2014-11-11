@@ -6,15 +6,15 @@ import (
 
 type keeperStruct struct {
 	sync.RWMutex
-	links   map[int64](chan ServiceResult)
-	counter int64
+	links   map[uint64](chan ServiceResult)
+	counter uint64
 }
 
 func newKeeperStruct() *keeperStruct {
-	return &keeperStruct{links: make(map[int64]chan ServiceResult)}
+	return &keeperStruct{links: make(map[uint64]chan ServiceResult)}
 }
 
-func (keeper *keeperStruct) Attach(out chan ServiceResult) int64 {
+func (keeper *keeperStruct) Attach(out chan ServiceResult) uint64 {
 	keeper.Lock()
 	defer keeper.Unlock()
 	keeper.counter++
@@ -22,20 +22,20 @@ func (keeper *keeperStruct) Attach(out chan ServiceResult) int64 {
 	return keeper.counter
 }
 
-func (keeper *keeperStruct) Detach(id int64) {
+func (keeper *keeperStruct) Detach(id uint64) {
 	keeper.Lock()
 	defer keeper.Unlock()
 	delete(keeper.links, id)
 }
 
-func (keeper *keeperStruct) Get(id int64) (ch chan ServiceResult, ok bool) {
+func (keeper *keeperStruct) Get(id uint64) (ch chan ServiceResult, ok bool) {
 	keeper.RLock()
 	defer keeper.RUnlock()
 	ch, ok = keeper.links[id]
 	return
 }
 
-func (keeper *keeperStruct) Keys() (keys []int64) {
+func (keeper *keeperStruct) Keys() (keys []uint64) {
 	keeper.RLock()
 	defer keeper.RUnlock()
 	for k := range keeper.links {

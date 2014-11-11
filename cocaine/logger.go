@@ -3,107 +3,65 @@ package cocaine
 import (
 	"fmt"
 	"sync"
-	"time"
+	// "time"
 )
 
+//{0: ['emit', {}, {}],
+// 1: ['verbosity', {}, {0: ['value', {}], 1: ['error', {}]}],
+// 2: ['set_verbosity', {}, {0: ['value', {}], 1: ['error', {}]}]}
+
 type Logger struct {
-	socketWriter
+	*Service
 	verbosity       int
 	args            []interface{}
 	mutex           sync.Mutex
 	is_reconnecting bool
-    name string
+	name            string
+	target          string
 }
 
 const (
-	LOGINGNORE = iota
-	LOGERROR
-	LOGWARN
+	LOGDEBUG = iota
 	LOGINFO
-	LOGDEBUG
+	LOGWARN
+	LOGERROR
 )
 
 func NewLogger(args ...interface{}) (logger *Logger, err error) {
 	return NewLoggerWithName("logging", args...)
 }
 
-func createTempService(name string, args ...interface{}) (endpoint string, verbosity int, err error) {
-	temp, err := NewService(name, args...)
-	if err != nil {
-		return
-	}
-	defer temp.Close()
-
-	res := <-temp.Call("verbosity")
-	if res.Err() != nil {
-		err = fmt.Errorf("%s", "cocaine: unable to receive verbosity")
-		return
-	}
-	verbosity = 0
-	if err = res.Extract(&verbosity); err != nil {
-		return
-	}
-	endpoint = temp.ResolveResult.AsString()
-	return
-}
-
-func createIO(name string, args ...interface{}) (sock socketWriter, verbosity int, err error) {
-	endpoint, verbosity, err := createTempService(name, args...)
-	if err != nil {
-		return
-	}
-	sock, err = newWSocket("tcp", endpoint, time.Second*5)
-	if err != nil {
-		return
-	}
-	return
-}
-
 func NewLoggerWithName(loggerName string, args ...interface{}) (logger *Logger, err error) {
-	sock, verbosity, err := createIO(loggerName, args...)
+	service, err := NewService(loggerName, args...)
 	if err != nil {
 		return
 	}
 
-	//Create logger
-	logger = &Logger{sock, verbosity, args, sync.Mutex{}, false, loggerName}
+	res := <-service.Call("verbosity")
+	if res.Err() != nil {
+		err = fmt.Errorf("cocaine: unable to receive verbosity")
+		return
+	}
+
+	_, raw_verbosity, err := res.Result()
+	if err != nil {
+		return nil, fmt.Errorf("cocaine: unable to receive verbosity")
+	}
+	verbosity := int(raw_verbosity[0].(int64))
+
+	logger = &Logger{
+		Service:         service,
+		verbosity:       verbosity,
+		args:            args,
+		is_reconnecting: false,
+		name:            loggerName,
+		target:          fmt.Sprintf("app/%s", flagApp),
+	}
 	return
 }
 
 func (logger *Logger) Reconnect(force bool) error {
-	if !logger.is_reconnecting { // double check
-		logger.mutex.Lock()
-		defer logger.mutex.Unlock()
-
-		if logger.is_reconnecting {
-			return fmt.Errorf("%s", "Service is reconnecting now")
-		}
-		logger.is_reconnecting = true
-		defer func() { logger.is_reconnecting = false }()
-
-		if !force {
-			select {
-			case <-logger.IsClosed():
-			default:
-				return fmt.Errorf("%s", "Service is already connected")
-			}
-		}
-
-		// Create new socket
-		sock, verbosity, err := createIO(logger.name, logger.args...)
-		if err != nil {
-			return err
-		}
-
-		// Dispose old IO interface
-		logger.socketWriter.Close()
-		// Reset IO interface
-		logger.socketWriter = sock
-		// Reset verbosity
-		logger.verbosity = verbosity
-		return nil
-	}
-	return fmt.Errorf("%s", "Service is reconnecting now")
+	return logger.Service.Reconnect(force)
 }
 
 func (logger *Logger) log(level int64, message ...interface{}) bool {
@@ -115,8 +73,7 @@ func (logger *Logger) log(level int64, message ...interface{}) bool {
 				return false
 			}
 		default:
-			msg := ServiceMethod{messageInfo{0, 0}, []interface{}{level, fmt.Sprintf("app/%s", flagApp), fmt.Sprint(message...)}}
-			logger.Write() <- packMsg(&msg)
+			logger.Service.Call("emit", level, logger.target, fmt.Sprint(message...))
 			return true
 		}
 	}
@@ -124,37 +81,41 @@ func (logger *Logger) log(level int64, message ...interface{}) bool {
 }
 
 func (logger *Logger) Err(message ...interface{}) {
-	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, message...)
+	_ = LOGERROR >= logger.verbosity && logger.log(LOGERROR, message...)
 }
 
 func (logger *Logger) Errf(format string, args ...interface{}) {
-	_ = LOGERROR <= logger.verbosity && logger.log(LOGERROR, fmt.Sprintf(format, args...))
+	_ = LOGERROR >= logger.verbosity && logger.log(LOGERROR, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Warn(message ...interface{}) {
-	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, message...)
+	_ = LOGWARN >= logger.verbosity && logger.log(LOGWARN, message...)
 }
 
 func (logger *Logger) Warnf(format string, args ...interface{}) {
-	_ = LOGWARN <= logger.verbosity && logger.log(LOGWARN, fmt.Sprintf(format, args...))
+	_ = LOGWARN >= logger.verbosity && logger.log(LOGWARN, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Info(message ...interface{}) {
-	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, message...)
+	_ = LOGINFO >= logger.verbosity && logger.log(LOGINFO, message...)
 }
 
 func (logger *Logger) Infof(format string, args ...interface{}) {
-	_ = LOGINFO <= logger.verbosity && logger.log(LOGINFO, fmt.Sprintf(format, args...))
+	_ = LOGINFO >= logger.verbosity && logger.log(LOGINFO, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Debug(message ...interface{}) {
-	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, message...)
+	_ = LOGDEBUG >= logger.verbosity && logger.log(LOGDEBUG, message...)
 }
 
 func (logger *Logger) Debugf(format string, args ...interface{}) {
-	_ = LOGDEBUG <= logger.verbosity && logger.log(LOGDEBUG, fmt.Sprintf(format, args...))
+	_ = LOGDEBUG >= logger.verbosity && logger.log(LOGDEBUG, fmt.Sprintf(format, args...))
 }
 
 func (logger *Logger) Close() {
-	logger.socketWriter.Close()
+	logger.socketIO.Close()
+}
+
+func (l *Logger) Verbosity() int {
+	return l.verbosity
 }

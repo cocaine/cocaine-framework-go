@@ -1,7 +1,7 @@
 package cocaine
 
 import (
-	"bytes"
+	// "bytes"
 	"fmt"
 
 	uuid "github.com/satori/go.uuid"
@@ -18,12 +18,7 @@ const (
 	CHOKE
 )
 
-type rawMessage []byte
-
-var (
-	mh codec.MsgpackHandle
-	h  = &mh
-)
+type rawMessage interface{}
 
 type messageInfo struct {
 	Number  int64
@@ -207,59 +202,4 @@ var unpackers = map[int64]unpacker{
 	CHUNK:     unpackChunk,
 	ERROR:     unpackErrorMsg,
 	CHOKE:     unpackChoke,
-}
-
-// Common unpacker
-func unpackMessage(input []interface{}) (msg messageInterface, err error) {
-	var session int64
-
-	switch input[1].(type) {
-	case uint64:
-		session = int64(input[1].(uint64))
-	case int64:
-		session = input[1].(int64)
-	}
-
-	unpacker, ok := unpackers[input[0].(int64)]
-
-	if !ok {
-		err = fmt.Errorf("cocaine: invalid message type: %d", input[0].(int64))
-	}
-
-	data := input[2].([]interface{})
-	msg, err = unpacker(session, data)
-
-	return
-}
-
-type streamUnpacker struct {
-	buf []byte
-}
-
-func (unpacker *streamUnpacker) Feed(data []byte) []messageInterface {
-	var msgs []messageInterface
-	unpacker.buf = append(unpacker.buf, data...)
-	tmp := bytes.NewBuffer(unpacker.buf)
-	dec := codec.NewDecoder(tmp, h)
-	for {
-		var res []interface{}
-		err := dec.Decode(&res)
-		if err != nil {
-			break
-		} else {
-			msg, err := unpackMessage(res)
-			if err != nil {
-				fmt.Printf("Error occured: %s", err)
-				continue
-			}
-			msgs = append(msgs, msg)
-			unpacker.buf = unpacker.buf[len(unpacker.buf)-tmp.Len():]
-		}
-
-	}
-	return msgs
-}
-
-func newStreamUnpacker() *streamUnpacker {
-	return &streamUnpacker{make([]byte, 0)}
 }

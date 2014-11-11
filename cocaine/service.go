@@ -5,24 +5,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ugorji/go/codec"
+	// "github.com/ugorji/go/codec"
 )
 
 type ServiceResult interface {
-	Extract(interface{}) error
+	// Extract(interface{}) error
+	Result() (uint64, []interface{}, error)
 	Err() error
 }
 
 type serviceRes struct {
-	res []byte
-	err error
+	payload []interface{}
+	method  uint64
+	err     error
 }
 
 //Unpacks the result of the called method in the passed structure.
 //You can transfer the structure of a particular type that will avoid the type checking. Look at examples.
-func (s *serviceRes) Extract(target interface{}) (err error) {
-	err = codec.NewDecoderBytes(s.res, h).Decode(&target)
-	return
+// func (s *serviceRes) Extract(target interface{}) (err error) {
+// 	// err = codec.NewDecoderBytes(s.res, h).Decode(&target)
+// 	return
+// }
+
+func (s *serviceRes) Result() (uint64, []interface{}, error) {
+	return s.method, s.payload, s.err
 }
 
 //Error status
@@ -81,11 +87,11 @@ func getServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan Servi
 //Allows you to invoke methods of services and send events to other cloud applications.
 type Service struct {
 	sessions *keeperStruct
-	unpacker *streamUnpacker
-	stop     chan bool
-	args     []interface{}
-	name     string
-	ResolveResult
+	// unpacker *streamUnpacker
+	stop chan bool
+	args []interface{}
+	name string
+	*ResolveResult
 	socketIO
 	mutex           sync.Mutex
 	wg              sync.WaitGroup
@@ -94,40 +100,42 @@ type Service struct {
 
 //Creates new service instance with specifed name.
 //Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
-func serviceResolve(name string, args ...interface{}) (info ResolveResult, err error) {
+func serviceResolve(name string, args ...interface{}) (info *ResolveResult, err error) {
 	l, err := NewLocator(args...)
 	if err != nil {
 		return
 	}
 	defer l.Close()
-	info = <-l.Resolve(name)
+	resolveresult := <-l.Resolve(name)
+	info = resolveresult.ResolveResult
+	err = resolveresult.Err
 	return
 }
 
-func serviceCreateIO(endpoint string) (sock socketIO, err error) {
-	sock, err = newAsyncRWSocket("tcp", endpoint, time.Second*5)
+func serviceCreateIO(endpoints []EndpointItem) (sock socketIO, err error) {
+	for _, endpoint := range endpoints {
+		sock, err = newAsyncRWSocket("tcp", endpoint.String(), time.Second*1)
+		if err != nil {
+			continue
+		}
+	}
 	return
 }
 
 func NewService(name string, args ...interface{}) (s *Service, err error) {
 	info, err := serviceResolve(name, args...)
 	if err != nil {
-		return
-	}
-
-	if !info.success {
 		err = fmt.Errorf("Unable to resolve service %s", name)
 		return
 	}
 
-	sock, err := serviceCreateIO(info.Endpoint.AsString())
+	sock, err := serviceCreateIO(info.Endpoints)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("Unable to connect to service %s: %s", name, err)
 	}
 
 	s = &Service{
 		sessions:        newKeeperStruct(),
-		unpacker:        newStreamUnpacker(),
 		stop:            make(chan bool),
 		args:            args,
 		name:            name,
@@ -143,22 +151,14 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 
 func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
-		for _, item := range service.unpacker.Feed(data) {
-			switch msg := item.(type) {
-			case *chunk:
-				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-					ch <- &serviceRes{msg.Data, nil}
-				}
-			case *choke:
-				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-					close(ch)
-					service.sessions.Detach(msg.getSessionID())
-				}
-			case *errorMsg:
-				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
-					ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
-				}
+		fmt.Println("SERVICE LOOP DATA", data.MsgType, data.Session, data.Payload)
+		if ch, ok := service.sessions.Get(data.Session); ok {
+			ch <- &serviceRes{
+				payload: data.Payload,
+				method:  data.MsgType,
 			}
+		} else {
+			fmt.Println("Unkonown session", data)
 		}
 	}
 }
@@ -180,15 +180,17 @@ func (service *Service) Reconnect(force bool) error {
 				return fmt.Errorf("%s", "Service is already connected")
 			}
 		}
+
 		// Send error to all open sessions
 		for _, key := range service.sessions.Keys() {
-			service.sessions.RLock()
 			fmt.Println(key)
-			if ch, ok := service.sessions.Get(key); ok {
-				ch <- &serviceRes{nil, &ServiceError{-100, "Disconnected"}}
-			}
-			service.sessions.RUnlock()
-			service.sessions.Detach(key)
+			//FIX THIS
+			// service.sessions.RLock()
+			// if ch, ok := service.sessions.Get(key); ok {
+			// 	ch <- &serviceRes{nil, &ServiceError{-100, "Disconnected"}}
+			// }
+			// service.sessions.RUnlock()
+			// service.sessions.Detach(key)
 		}
 
 		// Create new socket
@@ -196,16 +198,18 @@ func (service *Service) Reconnect(force bool) error {
 		if err != nil {
 			return err
 		}
-		sock, err := serviceCreateIO(info.Endpoint.AsString())
+		sock, err := serviceCreateIO(info.Endpoints)
 		if err != nil {
 			return err
 		}
 
 		// Dispose old IO interface
 		service.Close()
+
+		// Reattach channels and network IO
 		service.stop = make(chan bool)
 		service.socketIO = sock
-		service.unpacker = newStreamUnpacker()
+		// Start service loop
 		go service.loop()
 		return nil
 	}
@@ -213,16 +217,19 @@ func (service *Service) Reconnect(force bool) error {
 }
 
 func (service *Service) call(name string, args ...interface{}) chan ServiceResult {
-	method, err := service.getMethodNumber(name)
+	method, err := service.ResolveResult.API.MethodByName(name)
 	if err != nil {
 		errorOut := make(chan ServiceResult, 1)
-		errorOut <- &serviceRes{nil, &ServiceError{-100, "Wrong method name"}}
+		errorOut <- &serviceRes{
+			err: &ServiceError{-100, "Wrong method name"},
+		}
 		return errorOut
 	}
 	in, out := service.getServiceChanPair()
 	id := service.sessions.Attach(in)
-	msg := ServiceMethod{messageInfo{method, id}, args}
-	service.socketIO.Write() <- packMsg(&msg)
+	// FIX THIS!!!
+	msg := GeneralMessage{Message{id, method}, args}
+	service.socketIO.Write() <- msg
 	return out
 }
 
@@ -232,7 +239,9 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 	case <-service.IsClosed():
 		if err := service.Reconnect(false); err != nil {
 			errorOut := make(chan ServiceResult, 1)
-			errorOut <- &serviceRes{nil, &ServiceError{-32, "Disconnected"}}
+			errorOut <- &serviceRes{
+				err: &ServiceError{-32, "Disconnected"},
+			}
 			return errorOut
 		}
 	default:
@@ -242,7 +251,8 @@ func (service *Service) Call(name string, args ...interface{}) chan ServiceResul
 
 //Disposes resources of a service. You must call this method if the service isn't used anymore.
 func (service *Service) Close() {
-	close(service.stop) // Broadcast all related goroutines about disposing
+	// Broadcast all related goroutines about disposing
+	close(service.stop)
 	service.socketIO.Close()
 }
 

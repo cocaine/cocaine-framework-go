@@ -1,36 +1,38 @@
 package cocaine
 
 import (
+	"io"
 	"net"
 	"sync"
 	"time"
 
 	"log"
+
+	"github.com/ugorji/go/codec"
+)
+
+var (
+	mh codec.MsgpackHandle
+	h  = &mh
 )
 
 var _ = log.Println
 
 type socketIO interface {
-	Read() chan rawMessage
-	Write() chan rawMessage
-	IsClosed() <-chan struct{}
-	Close()
-}
-
-type socketWriter interface {
-	Write() chan rawMessage
+	Read() chan GeneralMessage
+	Write() chan GeneralMessage
 	IsClosed() <-chan struct{}
 	Close()
 }
 
 type asyncBuff struct {
-	in, out chan rawMessage
+	in, out chan GeneralMessage
 	stop    chan bool
 	wg      sync.WaitGroup
 }
 
 func newAsyncBuf() *asyncBuff {
-	buf := asyncBuff{make(chan rawMessage), make(chan rawMessage), make(chan bool, 1), sync.WaitGroup{}}
+	buf := asyncBuff{make(chan GeneralMessage), make(chan GeneralMessage), make(chan bool, 1), sync.WaitGroup{}}
 	buf.loop()
 	return &buf
 }
@@ -39,14 +41,14 @@ func (bf *asyncBuff) loop() {
 	go func() {
 		bf.wg.Add(1)
 		defer bf.wg.Done()
-		var pending []rawMessage // data buffer
-		var _in chan rawMessage  // incoming channel
+		var pending []GeneralMessage // data buffer
+		var _in chan GeneralMessage  // incoming channel
 		_in = bf.in
 
 		finished := false // flag
 		for {
-			var first rawMessage
-			var _out chan rawMessage
+			var first GeneralMessage
+			var _out chan GeneralMessage
 			if len(pending) > 0 {
 				first = pending[0]
 				_out = bf.out
@@ -62,7 +64,6 @@ func (bf *asyncBuff) loop() {
 					_in = nil
 				}
 			case _out <- first:
-				pending[0] = nil
 				pending = pending[1:]
 			case <-bf.stop:
 				close(bf.out) // Notify receiver
@@ -80,7 +81,7 @@ func (bf *asyncBuff) Stop() (res bool) {
 
 // Biderectional socket
 type asyncRWSocket struct {
-	net.Conn
+	conn           io.ReadWriteCloser
 	clientToSock   *asyncBuff
 	socketToClient *asyncBuff
 	closed         chan struct{} //broadcast channel
@@ -112,7 +113,7 @@ func (sock *asyncRWSocket) close() {
 	case <-sock.closed: // Already closed
 	default:
 		close(sock.closed)
-		sock.Conn.Close()
+		sock.conn.Close()
 	}
 }
 
@@ -120,18 +121,20 @@ func (sock *asyncRWSocket) IsClosed() (broadcast <-chan struct{}) {
 	return sock.closed
 }
 
-func (sock *asyncRWSocket) Write() chan rawMessage {
+func (sock *asyncRWSocket) Write() chan GeneralMessage {
 	return sock.clientToSock.in
 }
 
-func (sock *asyncRWSocket) Read() chan rawMessage {
+func (sock *asyncRWSocket) Read() chan GeneralMessage {
 	return sock.socketToClient.out
 }
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
+		h.StructToArray = true
+		encoder := codec.NewEncoder(sock.conn, h)
 		for incoming := range sock.clientToSock.out {
-			_, err := sock.Conn.Write(incoming) //Add check for sending full
+			err := encoder.Encode(incoming)
 			if err != nil {
 				sock.close()
 				return
@@ -142,86 +145,16 @@ func (sock *asyncRWSocket) writeloop() {
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		buf := make([]byte, 65536)
+		decoder := codec.NewDecoder(sock.conn, h)
 		for {
-			count, err := sock.Conn.Read(buf)
+			var message GeneralMessage
+			err := decoder.Decode(&message)
 			if err != nil {
 				close(sock.socketToClient.in)
 				sock.close()
 				return
 			}
-			bufferToSend := make([]byte, count)
-			copy(bufferToSend[:], buf[:count])
-			sock.socketToClient.in <- bufferToSend
-		}
-	}()
-}
-
-// WriteOnly Socket
-type asyncWSocket struct {
-	net.Conn
-	clientToSock *asyncBuff
-	closed       chan struct{} //broadcast channel
-	mutex        sync.Mutex
-}
-
-func newWSocket(family string, address string, timeout time.Duration) (*asyncWSocket, error) {
-	conn, err := net.DialTimeout(family, address, timeout)
-	if err != nil {
-		return nil, err
-	}
-
-	sock := asyncWSocket{conn, newAsyncBuf(), make(chan struct{}), sync.Mutex{}}
-	sock.readloop()
-	sock.writeloop()
-	return &sock, nil
-}
-
-func (sock *asyncWSocket) Write() chan rawMessage {
-	return sock.clientToSock.in
-}
-
-func (sock *asyncWSocket) close() {
-	sock.mutex.Lock() // Is it really necessary???
-	defer sock.mutex.Unlock()
-	select {
-	case <-sock.closed: // Already closed
-	default:
-		close(sock.closed)
-		sock.Conn.Close()
-	}
-}
-
-func (sock *asyncWSocket) Close() {
-	sock.close()
-	sock.clientToSock.Stop()
-}
-
-func (sock *asyncWSocket) IsClosed() (broadcast <-chan struct{}) {
-	return sock.closed
-}
-
-func (sock *asyncWSocket) writeloop() {
-	go func() {
-		for incoming := range sock.clientToSock.out {
-			_, err := sock.Conn.Write(incoming) //Add check for sending full
-			if err != nil {
-				sock.close()
-				return
-			}
-		}
-	}()
-}
-
-func (sock *asyncWSocket) readloop() {
-	go func() {
-		buf := make([]byte, 2048)
-		for {
-			_, err := sock.Conn.Read(buf)
-			if err != nil {
-				sock.close()
-				return
-			}
+			sock.socketToClient.in <- message
 		}
 	}()
 }
