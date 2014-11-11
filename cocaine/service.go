@@ -23,6 +23,9 @@ type serviceRes struct {
 //Unpacks the result of the called method in the passed structure.
 //You can transfer the structure of a particular type that will avoid the type checking. Look at examples.
 func (s *serviceRes) Extract(target interface{}) (err error) {
+	if s.err != nil {
+		return s.err
+	}
 	return convertPayload(s.payload, target)
 }
 
