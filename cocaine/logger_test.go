@@ -7,7 +7,6 @@ import (
 
 func TestLogger(t *testing.T) {
 	logger, err := NewLogger()
-	t.Log(logger)
 	if err != nil {
 		t.Fatalf("unable to create logger %s", err)
 	}

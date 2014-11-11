@@ -43,15 +43,21 @@ func NewLoggerWithName(loggerName string, args ...interface{}) (logger *Logger, 
 		return
 	}
 
-	_, raw_verbosity, err := res.Result()
-	if err != nil {
-		return nil, fmt.Errorf("cocaine: unable to receive verbosity")
+	if res.Err() != nil {
+		err = fmt.Errorf("cocaine: unable to receive verbosity: %s", res.Err())
 	}
-	verbosity := int(raw_verbosity[0].(int64))
+
+	var verbosity struct {
+		Verbosity int
+	}
+
+	if err := res.Extract(&verbosity); err != nil {
+		return nil, fmt.Errorf("cocaine: unable to extract verbosity: %s", err)
+	}
 
 	logger = &Logger{
 		Service:         service,
-		verbosity:       verbosity,
+		verbosity:       verbosity.Verbosity,
 		args:            args,
 		is_reconnecting: false,
 		name:            loggerName,

@@ -9,7 +9,7 @@ import (
 )
 
 type ServiceResult interface {
-	// Extract(interface{}) error
+	Extract(interface{}) error
 	Result() (uint64, []interface{}, error)
 	Err() error
 }
@@ -22,10 +22,9 @@ type serviceRes struct {
 
 //Unpacks the result of the called method in the passed structure.
 //You can transfer the structure of a particular type that will avoid the type checking. Look at examples.
-// func (s *serviceRes) Extract(target interface{}) (err error) {
-// 	// err = codec.NewDecoderBytes(s.res, h).Decode(&target)
-// 	return
-// }
+func (s *serviceRes) Extract(target interface{}) (err error) {
+	return convertPayload(s.payload, target)
+}
 
 func (s *serviceRes) Result() (uint64, []interface{}, error) {
 	return s.method, s.payload, s.err
@@ -151,14 +150,11 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 
 func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
-		fmt.Println("SERVICE LOOP DATA", data.MsgType, data.Session, data.Payload)
 		if ch, ok := service.sessions.Get(data.Session); ok {
 			ch <- &serviceRes{
 				payload: data.Payload,
 				method:  data.MsgType,
 			}
-		} else {
-			fmt.Println("Unkonown session", data)
 		}
 	}
 }
@@ -183,14 +179,15 @@ func (service *Service) Reconnect(force bool) error {
 
 		// Send error to all open sessions
 		for _, key := range service.sessions.Keys() {
-			fmt.Println(key)
-			//FIX THIS
-			// service.sessions.RLock()
-			// if ch, ok := service.sessions.Get(key); ok {
-			// 	ch <- &serviceRes{nil, &ServiceError{-100, "Disconnected"}}
-			// }
-			// service.sessions.RUnlock()
-			// service.sessions.Detach(key)
+			service.sessions.RLock()
+			if ch, ok := service.sessions.Get(key); ok {
+				ch <- &serviceRes{
+					payload: nil,
+					method:  1,
+					err:     &ServiceError{-100, "Disconnected"}}
+			}
+			service.sessions.RUnlock()
+			service.sessions.Detach(key)
 		}
 
 		// Create new socket
