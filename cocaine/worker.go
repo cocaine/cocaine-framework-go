@@ -1,29 +1,15 @@
 package cocaine
 
 import (
-	"flag"
-	// "fmt"
-	// "os"
-	// "runtime/debug"
-	// "time"
+// "flag"
+// "fmt"
+// "os"
+// "runtime/debug"
+// "time"
 
-	// uuid "github.com/satori/go.uuid"
-	// "github.com/ugorji/go/codec"
+// uuid "github.com/satori/go.uuid"
+// "github.com/ugorji/go/codec"
 )
-
-var (
-	flagUUID     string
-	flagEndpoint string
-	flagApp      string
-	flagLocator  string
-)
-
-func init() {
-	flag.StringVar(&flagUUID, "uuid", "", "UUID")
-	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
-	flag.StringVar(&flagLocator, "locator", "localhost:10053", "Connection path")
-}
 
 // const (
 // 	HEARTBEAT_TIMEOUT = time.Second * 20

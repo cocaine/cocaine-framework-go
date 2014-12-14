@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	// "github.com/ugorji/go/codec"
 )
 
 type ServiceResult interface {
@@ -88,35 +86,34 @@ func getServiceChanPair(stop <-chan bool) (In chan ServiceResult, Out chan Servi
 
 //Allows you to invoke methods of services and send events to other cloud applications.
 type Service struct {
-	sessions *keeperStruct
-	// unpacker *streamUnpacker
-	stop chan bool
-	args []interface{}
-	name string
-	*ResolveResult
+	mutex sync.Mutex
+	wg    sync.WaitGroup
 	socketIO
-	mutex           sync.Mutex
-	wg              sync.WaitGroup
+	*ServiceInfo
+	sessions        *keeperStruct
+	stop            chan struct{}
+	args            []interface{}
+	name            string
 	is_reconnecting bool
 }
 
 //Creates new service instance with specifed name.
 //Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
-func serviceResolve(name string, args ...interface{}) (info *ResolveResult, err error) {
+func serviceResolve(name string, args ...interface{}) (info *ServiceInfo, err error) {
 	l, err := NewLocator(args...)
 	if err != nil {
 		return
 	}
 	defer l.Close()
-	resolveresult := <-l.Resolve(name)
-	info = resolveresult.ResolveResult
-	err = resolveresult.Err
+	serviceInfo := <-l.Resolve(name)
+	info = serviceInfo.ServiceInfo
+	err = serviceInfo.Err
 	return
 }
 
 func serviceCreateIO(endpoints []EndpointItem) (sock socketIO, err error) {
 	for _, endpoint := range endpoints {
-		sock, err = newAsyncRWSocket("tcp", endpoint.String(), time.Second*1)
+		sock, err = newAsyncConnection("tcp", endpoint.String(), time.Second*1)
 		if err != nil {
 			continue
 		}
@@ -137,14 +134,12 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 	}
 
 	s = &Service{
+		ServiceInfo:     info,
+		socketIO:        sock,
 		sessions:        newKeeperStruct(),
-		stop:            make(chan bool),
+		stop:            make(chan struct{}),
 		args:            args,
 		name:            name,
-		ResolveResult:   info,
-		socketIO:        sock,
-		mutex:           sync.Mutex{},
-		wg:              sync.WaitGroup{},
 		is_reconnecting: false,
 	}
 	go s.loop()
@@ -207,7 +202,7 @@ func (service *Service) Reconnect(force bool) error {
 		service.Close()
 
 		// Reattach channels and network IO
-		service.stop = make(chan bool)
+		service.stop = make(chan struct{})
 		service.socketIO = sock
 		// Start service loop
 		go service.loop()
@@ -217,7 +212,7 @@ func (service *Service) Reconnect(force bool) error {
 }
 
 func (service *Service) call(name string, args ...interface{}) chan ServiceResult {
-	method, err := service.ResolveResult.API.MethodByName(name)
+	method, err := service.API.MethodByName(name)
 	if err != nil {
 		errorOut := make(chan ServiceResult, 1)
 		errorOut <- &serviceRes{
@@ -228,7 +223,10 @@ func (service *Service) call(name string, args ...interface{}) chan ServiceResul
 	in, out := service.getServiceChanPair()
 	id := service.sessions.Attach(in)
 	// FIX THIS!!!
-	msg := GeneralMessage{Message{id, method}, args}
+	msg := &Message{
+		CommonMessageInfo{id, method},
+		args,
+	}
 	service.socketIO.Write() <- msg
 	return out
 }

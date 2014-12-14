@@ -3,7 +3,6 @@ package cocaine
 import (
 	"fmt"
 	"sync"
-	// "time"
 )
 
 //{0: ['emit', {}, {}],
@@ -11,10 +10,10 @@ import (
 // 2: ['set_verbosity', {}, {0: ['value', {}], 1: ['error', {}]}]}
 
 type Logger struct {
+	mutex sync.Mutex
 	*Service
 	verbosity       int
 	args            []interface{}
-	mutex           sync.Mutex
 	is_reconnecting bool
 	name            string
 	target          string
@@ -61,7 +60,7 @@ func NewLoggerWithName(loggerName string, args ...interface{}) (logger *Logger, 
 		args:            args,
 		is_reconnecting: false,
 		name:            loggerName,
-		target:          fmt.Sprintf("app/%s", flagApp),
+		target:          fmt.Sprintf("app/%s", DefaultAppName),
 	}
 	return
 }
