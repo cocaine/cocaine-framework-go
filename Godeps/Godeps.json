@@ -1,0 +1,21 @@
+{
+	"ImportPath": "_/Users/noxiouz/go/src/github.com/cocaine/cocaine-framework-go",
+	"GoVersion": "go1.3.1",
+	"Packages": [
+		"github.com/cocaine/cocaine-framework-go/cocaine"
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "a07c134f8289edd9ac6ee6f0aa5f3d345f4aaf27"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "d6577e08ec30538639ac0ea38b562b6f250e9055"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "e906e395b9d45d3230e800c8ad1f92f99764e753"
+		}
+	]
+}
