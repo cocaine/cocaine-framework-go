@@ -33,14 +33,21 @@ type DispatchMap map[uint64]DispatchItem
 
 type DispatchItem struct {
 	Name       string
-	Downstream StreamDescription
-	Upstream   StreamDescription
+	Downstream *StreamDescription
+	Upstream   *StreamDescription
 }
 
-type StreamDescription map[uint64]struct {
+type StreamDescription map[uint64]*StreamDescriptionItem
+
+type StreamDescriptionItem struct {
 	Name string
 	*StreamDescription
 }
+
+var (
+	EmptyDescription     *StreamDescription = &StreamDescription{}
+	RecursiveDescription *StreamDescription = nil
+)
 
 func (d *DispatchMap) Methods() []string {
 	var methods []string = make([]string, 0)
@@ -56,5 +63,5 @@ func (d *DispatchMap) MethodByName(name string) (uint64, error) {
 			return i, nil
 		}
 	}
-	return 0, fmt.Errorf("no method `%s`", name)
+	return 0, fmt.Errorf("no `%s` method", name)
 }

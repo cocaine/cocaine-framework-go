@@ -1,10 +1,19 @@
 package cocaine
 
 import (
+	"log"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	if testing.Verbose() {
+		l := log.New(os.Stderr, "[DEBUG TEST] ", log.LstdFlags)
+		DEBUGTEST = l.Printf
+	}
+}
 
 func TestLocatorResolve(t *testing.T) {
 	const (
@@ -17,7 +26,12 @@ func TestLocatorResolve(t *testing.T) {
 	}
 	defer l.Close()
 
-	r := <-l.Resolve(name)
+	ch, err := l.Resolve(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := <-ch
 	if r.Err != nil {
 		t.Fatalf("unable to unpack locator API %s", r.Err)
 	}
@@ -44,12 +58,23 @@ func TestNode(t *testing.T) {
 		t.Fatalf("unable to crete node service %s", err)
 	}
 
-	r := <-n.Call("list")
-	t.Log(r)
+	ch, err := n.Call("list")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	r = <-n.Call("start_app", "A", "default")
-	t.Log(r)
+	r, err := ch.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	var listing struct {
+		Data []string
+	}
+	if err := r.Extract(&listing); err != nil {
+		t.Fatalf("unable to unpack node.list %v", err)
+	}
+	t.Log(listing.Data)
 }
 
 func TestStorage(t *testing.T) {
@@ -57,6 +82,15 @@ func TestStorage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to crete node service %s", err)
 	}
-	r := <-s.Call("find", "profiles", []string{"profile"})
-	t.Log(r)
+	ch, err := s.Call("find", "profiles", []string{"profile"})
+	if err != nil {
+		t.Fatalf("Unable to create channel for storage.Find: %s", err)
+	}
+	res, err := ch.Get()
+	var listing struct {
+		Data []string
+	}
+	if err := res.Extract(&listing); err != nil {
+		t.Fatalf("unable to unpack storage.Fist %v", err)
+	}
 }

@@ -4,6 +4,11 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+var (
+	// it's pathed by test file
+	DEBUGTEST func(string, ...interface{}) = func(string, ...interface{}) {}
+)
+
 // It must be done other way
 func convertPayload(in interface{}, out interface{}) error {
 	var buf []byte

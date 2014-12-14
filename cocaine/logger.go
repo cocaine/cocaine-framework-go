@@ -13,7 +13,7 @@ type Logger struct {
 	mutex sync.Mutex
 	*Service
 	verbosity       int
-	args            []interface{}
+	args            []string
 	is_reconnecting bool
 	name            string
 	target          string
@@ -26,22 +26,23 @@ const (
 	LOGERROR
 )
 
-func NewLogger(args ...interface{}) (logger *Logger, err error) {
+func NewLogger(args ...string) (logger *Logger, err error) {
 	return NewLoggerWithName("logging", args...)
 }
 
-func NewLoggerWithName(loggerName string, args ...interface{}) (logger *Logger, err error) {
+func NewLoggerWithName(loggerName string, args ...string) (logger *Logger, err error) {
 	service, err := NewService(loggerName, args...)
 	if err != nil {
 		return
 	}
 
-	res := <-service.Call("verbosity")
-	if res.Err() != nil {
+	resCh, err := service.Call("verbosity")
+	if err != nil {
 		err = fmt.Errorf("cocaine: unable to receive verbosity")
 		return
 	}
 
+	res, err := resCh.Get()
 	if res.Err() != nil {
 		err = fmt.Errorf("cocaine: unable to receive verbosity: %s", res.Err())
 	}
