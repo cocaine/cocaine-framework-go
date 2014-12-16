@@ -18,11 +18,11 @@ const (
 	CHOKE
 )
 
-type rawMessage interface{}
+type rawMessage []byte
 
 type messageInfo struct {
+	Channel uint64
 	Number  int64
-	Channel int64
 }
 
 type handshakeStruct struct {
@@ -67,7 +67,7 @@ type ServiceMethod struct {
 
 type messageInterface interface {
 	getTypeID() int64
-	getSessionID() int64
+	getSessionID() uint64
 	getPayload() []interface{}
 }
 
@@ -75,7 +75,7 @@ func (msg *messageInfo) getTypeID() int64 {
 	return msg.Number
 }
 
-func (msg *messageInfo) getSessionID() int64 {
+func (msg *messageInfo) getSessionID() uint64 {
 	return msg.Channel
 }
 
