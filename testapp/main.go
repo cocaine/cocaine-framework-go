@@ -11,7 +11,7 @@ var (
 	//storage *cocaine.Storage
 )
 
-func dummy(request *cocaine.Request, response *cocaine.Response) {
+func dummy(request cocaine.Request, response cocaine.Response) {
 	defer response.Close()
 	logger, err := cocaine.NewLogger()
 	if err != nil {
@@ -24,7 +24,7 @@ func dummy(request *cocaine.Request, response *cocaine.Response) {
 	logger.Info("AFTER WRITE")
 }
 
-func echo(request *cocaine.Request, response *cocaine.Response) {
+func echo(request cocaine.Request, response cocaine.Response) {
 	inc := <-request.Read()
 	response.Write(inc)
 	response.Close()

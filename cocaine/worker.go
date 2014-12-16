@@ -16,16 +16,28 @@ const (
 	DISOWN_TIMEOUT    = time.Second * 5
 )
 
-type Request struct {
+type (
+	EventHandler func(Request, Response)
+
+	Request interface {
+		Read() chan *Message
+	}
+
+	Response interface {
+		Write(data interface{})
+		ErrorMsg(code int, msg string)
+		Close()
+	}
+)
+
+type requestImpl struct {
 	from_worker chan *Message
 	to_handler  chan *Message
 	quit        chan struct{}
 }
 
-type EventHandler func(*Request, *Response)
-
-func newRequest() *Request {
-	request := Request{
+func newRequest() *requestImpl {
+	request := requestImpl{
 		from_worker: make(chan *Message),
 		to_handler:  make(chan *Message),
 		quit:        make(chan struct{}),
@@ -58,28 +70,28 @@ func newRequest() *Request {
 	return &request
 }
 
-func (request *Request) push(msg *Message) {
+func (request *requestImpl) push(msg *Message) {
 	request.from_worker <- msg
 }
 
-func (request *Request) close() {
+func (request *requestImpl) close() {
 	close(request.quit)
 }
 
-func (request *Request) Read() chan *Message {
+func (request *requestImpl) Read() chan *Message {
 	return request.to_handler
 }
 
 // Datastream from worker to a client.
-type Response struct {
+type responseImpl struct {
 	session      uint64
 	from_handler chan *Message
 	to_worker    chan *Message
 	quit         chan struct{}
 }
 
-func newResponse(session uint64, to_worker chan *Message) *Response {
-	response := Response{
+func newResponse(session uint64, to_worker chan *Message) *responseImpl {
+	response := responseImpl{
 		session:      session,
 		from_handler: make(chan *Message),
 		to_worker:    to_worker,
@@ -115,7 +127,7 @@ func newResponse(session uint64, to_worker chan *Message) *Response {
 }
 
 // Sends chunk of data to a client.
-func (response *Response) Write(data interface{}) {
+func (response *responseImpl) Write(data interface{}) {
 	var res []byte
 	codec.NewEncoderBytes(&res, h).Encode(&data)
 	chunkMsg := Message{
@@ -129,7 +141,7 @@ func (response *Response) Write(data interface{}) {
 }
 
 // Notify a client about finishing the datastream.
-func (response *Response) Close() {
+func (response *responseImpl) Close() {
 	chokeMsg := Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: response.session,
@@ -142,7 +154,7 @@ func (response *Response) Close() {
 }
 
 // Send error to a client. Specify code and message, which describes this error.
-func (response *Response) ErrorMsg(code int, msg string) {
+func (response *responseImpl) ErrorMsg(code int, msg string) {
 	errorMessage := Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: response.session,
@@ -161,7 +173,7 @@ type Worker struct {
 	logger          *Logger
 	heartbeat_timer *time.Timer
 	disown_timer    *time.Timer
-	sessions        map[uint64](*Request)
+	sessions        map[uint64](*requestImpl)
 	from_handlers   chan *Message
 }
 
@@ -186,7 +198,7 @@ func NewWorker() (worker *Worker, err error) {
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
 		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
-		sessions:        make(map[uint64](*Request)),
+		sessions:        make(map[uint64](*requestImpl)),
 		from_handlers:   make(chan *Message),
 	}
 	w.disown_timer.Stop()
