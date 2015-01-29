@@ -2,7 +2,7 @@ package cocaine
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
+	"github.com/ugorji/go-msgpack"
 	"net/http"
 	"reflect"
 	"fmt"
