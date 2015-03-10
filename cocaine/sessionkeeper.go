@@ -19,30 +19,40 @@ func newKeeperStruct() *keeperStruct {
 
 func (keeper *keeperStruct) Attach(rx Rx) uint64 {
 	keeper.Lock()
-	defer keeper.Unlock()
+
 	keeper.counter++
 	keeper.links[keeper.counter] = rx
-	return keeper.counter
+	current := keeper.counter
+
+	keeper.Unlock()
+	return current
 }
 
 func (keeper *keeperStruct) Detach(id uint64) {
 	keeper.Lock()
-	defer keeper.Unlock()
+
 	delete(keeper.links, id)
+
+	keeper.Unlock()
 }
 
 func (keeper *keeperStruct) Get(id uint64) (Rx, bool) {
 	keeper.RLock()
-	defer keeper.RUnlock()
+
 	rx, ok := keeper.links[id]
+
+	keeper.RUnlock()
 	return rx, ok
 }
 
-func (keeper *keeperStruct) Keys() (keys []uint64) {
+func (keeper *keeperStruct) Keys() []uint64 {
 	keeper.RLock()
-	defer keeper.RUnlock()
+
+	var keys = make([]uint64, len(keeper.links))
 	for k := range keeper.links {
 		keys = append(keys, k)
 	}
-	return
+
+	keeper.RUnlock()
+	return keys
 }
