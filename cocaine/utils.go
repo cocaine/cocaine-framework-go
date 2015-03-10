@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	// it's pathed by test file
+	// it's patched by test file
 	DEBUGTEST func(string, ...interface{}) = func(string, ...interface{}) {}
 )
 

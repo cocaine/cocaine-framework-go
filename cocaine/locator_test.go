@@ -4,8 +4,6 @@ import (
 	"log"
 	"os"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func init() {
@@ -36,14 +34,17 @@ func TestLocatorResolve(t *testing.T) {
 		t.Fatalf("unable to unpack locator API %s", r.Err)
 	}
 
-	assert.Equal(t, r.Version, 1, "Wrong API version")
+	if r.Version != 1 {
+		t.Log("Wrong API version")
+	}
+
 	for _, k := range r.Endpoints {
 		t.Log(k.String())
 	}
 
 	if i, err := r.API.MethodByName("start_app"); err != nil {
 		t.Fatal(err)
-	} else if !assert.Equal(t, 0, i) {
+	} else if i != 0 {
 		t.Fatal("Unexpected method code", i)
 	}
 
