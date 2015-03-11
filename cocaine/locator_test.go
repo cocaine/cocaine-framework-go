@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -71,6 +72,27 @@ func TestNode(t *testing.T) {
 
 	var listing struct {
 		Data []string
+	}
+	if err := r.Extract(&listing); err != nil {
+		t.Fatalf("unable to unpack node.list %v", err)
+	}
+	t.Log(listing.Data)
+
+	if err := n.Reconnect(false); err == nil {
+		t.Fatal("Reconnect(false): error expected, got nil")
+	}
+	if err := n.Reconnect(true); err != nil {
+		t.Fatalf("Reconnect(true): %v", err)
+	}
+
+	ch, err = n.Call("list")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err = ch.Get(1 * time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if err := r.Extract(&listing); err != nil {
 		t.Fatalf("unable to unpack node.list %v", err)

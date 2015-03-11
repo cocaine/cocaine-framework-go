@@ -31,12 +31,13 @@ type rx struct {
 }
 
 func (rx *rx) Get(timeout ...time.Duration) (ServiceResult, error) {
+	DEBUGTEST("RX.Get has been called from %v", rx.pollBuffer)
+
 	var chanTimeout <-chan time.Time
 	if len(timeout) == 1 {
 		chanTimeout = time.After(timeout[0])
 	}
 
-	DEBUGTEST("RX.Get has been called from %v", rx.pollBuffer)
 	select {
 	case res := <-rx.pollBuffer:
 		DEBUGTEST("RX: case <-rx.buffer: %v", &rx)
@@ -80,7 +81,7 @@ func (s *serviceRes) Extract(target interface{}) (err error) {
 	return convertPayload(s.payload, target)
 }
 
-// ToDo: Extract method for array semantic
+// ToDo: Extract method for an array semantic
 // Extreact(target ...interface{})
 
 func (s *serviceRes) Result() (uint64, []interface{}, error) {
