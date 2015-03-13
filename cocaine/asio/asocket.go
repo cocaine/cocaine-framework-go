@@ -30,33 +30,39 @@ type asyncBuff struct {
 }
 
 func newAsyncBuf() *asyncBuff {
-	buf := asyncBuff{
+	buf := &asyncBuff{
 		in:   make(chan *Message),
 		out:  make(chan *Message),
 		stop: make(chan struct{})}
 
 	buf.loop()
-	return &buf
+	return buf
 }
 
 func (bf *asyncBuff) loop() {
+	bf.wg.Add(1)
 	go func() {
-		bf.wg.Add(1)
 		defer bf.wg.Done()
-		var pending []*Message // data buffer
-		var _in chan *Message  // incoming channel
-		_in = bf.in
+
+		var (
+			pending []*Message            // data buffer
+			_in     chan *Message = bf.in // incoming channel
+		)
 
 		finished := false // flag
 		for {
-			var first *Message
-			var _out chan *Message
+			var (
+				first *Message
+				_out  chan *Message
+			)
+
 			if len(pending) > 0 {
 				first = pending[0]
 				_out = bf.out
 			} else if finished {
-				break
+				return
 			}
+
 			select {
 			case incoming, ok := <-_in:
 				if ok {
@@ -87,27 +93,38 @@ type asyncRWSocket struct {
 	conn          io.ReadWriteCloser
 	upstreamBuf   *asyncBuff
 	downstreamBuf *asyncBuff
-	closed        chan struct{} //broadcast channel
+	closed        chan struct{} // broadcast channel
 }
 
 func newAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
-	sock := asyncRWSocket{
+	sock := &asyncRWSocket{
 		conn:          conn,
 		upstreamBuf:   newAsyncBuf(),
 		downstreamBuf: newAsyncBuf(),
 		closed:        make(chan struct{}),
 	}
+
 	sock.readloop()
 	sock.writeloop()
-	return &sock, nil
+
+	return sock, nil
 }
 
-func NewUnixSocketConnection(address string, timeout time.Duration) (SocketIO, error) {
+func NewUnixConnection(address string, timeout time.Duration) (SocketIO, error) {
 	return newAsyncConnection("unix", address, timeout)
 }
 
+func NewTCPConnection(address string, timeout time.Duration) (SocketIO, error) {
+	return newAsyncConnection("tcp", address, timeout)
+}
+
 func newAsyncConnection(family string, address string, timeout time.Duration) (SocketIO, error) {
-	conn, err := net.DialTimeout(family, address, timeout)
+	dialer := net.Dialer{
+		Timeout:   timeout,
+		DualStack: true,
+	}
+
+	conn, err := dialer.Dial(family, address)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +140,7 @@ func (sock *asyncRWSocket) Close() {
 func (sock *asyncRWSocket) close() {
 	sock.Lock()
 	defer sock.Unlock()
+
 	select {
 	case <-sock.closed: // Already closed
 	default:

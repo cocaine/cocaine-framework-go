@@ -24,8 +24,8 @@ func loop(input <-chan *asio.Message, output chan *asio.Message, onclose <-chan 
 		)
 
 		if len(pending) > 0 {
-			// if we have data to send
-			// pick first element from the queue
+			// if we have data to send,
+			// pick the first element from the queue
 			// and unlock `out case` in select
 			// Othrewise `out` is nil
 			first = pending[0]

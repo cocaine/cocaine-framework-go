@@ -61,7 +61,7 @@ func NewWorker() (*Worker, error) {
 	}
 
 	// Connect to cocaine-runtime over a unix socket
-	sock, err := asio.NewUnixSocketConnection(flagEndpoint, coreConnectionTimeout)
+	sock, err := asio.NewUnixConnection(flagEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (w *Worker) Run(handlers map[string]EventHandler) {
 		case <-w.disownTimer.C:
 			w.onDisown()
 
-		// ToDo: reply directly to a conenction
+		// ToDo: reply directly to a connection
 		case outcoming := <-w.fromHandlers:
 			w.Write() <- outcoming
 		}
