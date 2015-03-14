@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"time"
-
-	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
 )
 
 const (
@@ -21,12 +19,12 @@ const (
 )
 
 type RequestStream interface {
-	Push(*asio.Message)
+	Push(*Message)
 	Close()
 }
 
 type Request interface {
-	Read() chan *asio.Message
+	Read() chan *Message
 }
 
 type ResponseStream interface {
@@ -41,7 +39,7 @@ type EventHandler func(Request, ResponseStream)
 // and cocaine-runtime, dispatches incoming messages
 type Worker struct {
 	// Connection to cocaine-runtime
-	conn asio.SocketIO
+	conn SocketIO
 	// Id to introduce myself to cocaine-runtime
 	id string
 	// Each tick we shoud send a heartbeat as keep-alive
@@ -53,7 +51,7 @@ type Worker struct {
 	// Channel for replying from handlers
 	// Everything is piped to cocaine without changes
 	// ResponseStream is responsible to format proper message
-	fromHandlers chan *asio.Message
+	fromHandlers chan *Message
 	// handlers
 	handlers map[string]EventHandler
 	// Notify Run about stop
@@ -68,14 +66,14 @@ func NewWorker() (*Worker, error) {
 	workerID := flagUUID
 
 	// Connect to cocaine-runtime over a unix socket
-	sock, err := asio.NewUnixConnection(flagEndpoint, coreConnectionTimeout)
+	sock, err := NewUnixConnection(flagEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
 	return newWorker(sock, workerID)
 }
 
-func newWorker(conn asio.SocketIO, id string) (*Worker, error) {
+func newWorker(conn SocketIO, id string) (*Worker, error) {
 	w := &Worker{
 		conn: conn,
 		id:   id,
@@ -84,7 +82,7 @@ func newWorker(conn asio.SocketIO, id string) (*Worker, error) {
 		disownTimer:    time.NewTimer(disownTimeout),
 
 		sessions:     make(map[uint64]RequestStream),
-		fromHandlers: make(chan *asio.Message),
+		fromHandlers: make(chan *Message),
 		handlers:     make(map[string]EventHandler),
 
 		stopped: make(chan struct{}),
@@ -171,7 +169,7 @@ func (w *Worker) loop() {
 	}
 }
 
-func (w *Worker) onMessage(msg *asio.Message) {
+func (w *Worker) onMessage(msg *Message) {
 	switch msg.MsgType {
 	case ChunkType:
 		if reqStream, ok := w.sessions[msg.Session]; ok {

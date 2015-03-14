@@ -1,19 +1,15 @@
 package worker
 
-import (
-	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
-)
-
-func loop(input <-chan *asio.Message, output chan *asio.Message, onclose <-chan struct{}) {
+func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
 	var (
-		pending []*asio.Message
+		pending []*Message
 		closed  <-chan struct{} = onclose
 	)
 
 	for {
 		var (
-			out   chan *asio.Message
-			first *asio.Message
+			out   chan *Message
+			first *Message
 		)
 
 		if len(pending) > 0 {
@@ -50,15 +46,15 @@ func loop(input <-chan *asio.Message, output chan *asio.Message, onclose <-chan 
 }
 
 type request struct {
-	fromWorker chan *asio.Message
-	toHandler  chan *asio.Message
+	fromWorker chan *Message
+	toHandler  chan *Message
 	closed     chan struct{}
 }
 
 func newRequest() *request {
 	request := &request{
-		fromWorker: make(chan *asio.Message),
-		toHandler:  make(chan *asio.Message),
+		fromWorker: make(chan *Message),
+		toHandler:  make(chan *Message),
 		closed:     make(chan struct{}),
 	}
 
@@ -74,11 +70,11 @@ func newRequest() *request {
 	return request
 }
 
-func (request *request) Read() chan *asio.Message {
+func (request *request) Read() chan *Message {
 	return request.toHandler
 }
 
-func (request *request) Push(msg *asio.Message) {
+func (request *request) Push(msg *Message) {
 	request.fromWorker <- msg
 }
 
@@ -88,15 +84,15 @@ func (request *request) Close() {
 
 type response struct {
 	session     uint64
-	fromHandler chan *asio.Message
-	toWorker    chan *asio.Message
+	fromHandler chan *Message
+	toWorker    chan *Message
 	closed      chan struct{}
 }
 
-func newResponse(session uint64, toWorker chan *asio.Message) *response {
+func newResponse(session uint64, toWorker chan *Message) *response {
 	response := &response{
 		session:     session,
-		fromHandler: make(chan *asio.Message),
+		fromHandler: make(chan *Message),
 		toWorker:    toWorker,
 		closed:      make(chan struct{}),
 	}

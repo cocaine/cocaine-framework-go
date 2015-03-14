@@ -1,4 +1,4 @@
-package asio
+package worker
 
 import (
 	"io"
@@ -10,14 +10,14 @@ import (
 )
 
 var (
-	mh = codec.MsgpackHandle{
+	mhAsocket = codec.MsgpackHandle{
 		BasicHandle: codec.BasicHandle{
 			EncodeOptions: codec.EncodeOptions{
 				StructToArray: true,
 			},
 		},
 	}
-	h = &mh
+	hAsocket = &mhAsocket
 )
 
 type SocketIO interface {
@@ -169,7 +169,7 @@ func (sock *asyncRWSocket) Read() chan *Message {
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
-		encoder := codec.NewEncoder(sock.conn, h)
+		encoder := codec.NewEncoder(sock.conn, hAsocket)
 		for incoming := range sock.upstreamBuf.out {
 			err := encoder.Encode(incoming)
 			if err != nil {
@@ -182,7 +182,7 @@ func (sock *asyncRWSocket) writeloop() {
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		decoder := codec.NewDecoder(sock.conn, h)
+		decoder := codec.NewDecoder(sock.conn, hAsocket)
 		for {
 			var message *Message
 			err := decoder.Decode(&message)

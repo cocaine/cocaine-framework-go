@@ -4,9 +4,6 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	// "time"
-
-	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
 )
 
 type pipeConn struct {
@@ -32,8 +29,8 @@ func testConn() (io.ReadWriteCloser, io.ReadWriteCloser) {
 
 func TestWorker(t *testing.T) {
 	in, out := testConn()
-	sock, _ := asio.NewAsyncRW(out)
-	sock2, _ := asio.NewAsyncRW(in)
+	sock, _ := NewAsyncRW(out)
+	sock2, _ := NewAsyncRW(in)
 	w, err := newWorker(sock, "test")
 	if err != nil {
 		t.Fatal("unable to create worker", err)

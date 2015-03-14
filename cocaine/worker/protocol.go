@@ -1,98 +1,67 @@
 package worker
 
 import (
-	"github.com/hashicorp/go-msgpack/codec"
-
-	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
+	"fmt"
+	"net"
 )
+
+type Message struct {
+	CommonMessageInfo
+	Payload []interface{}
+}
+
+type CommonMessageInfo struct {
+	// Session id
+	Session uint64
+	// Message type number
+	MsgType uint64
+}
+
+// Description of service endpoint
+type EndpointItem struct {
+	//Service ip address
+	IP string
+	//Service port
+	Port uint64
+}
+
+func (e *EndpointItem) String() string {
+	return net.JoinHostPort(e.IP, fmt.Sprintf("%d", e.Port))
+}
+
+type DispatchMap map[uint64]DispatchItem
+
+type DispatchItem struct {
+	Name       string
+	Downstream *StreamDescription
+	Upstream   *StreamDescription
+}
+
+type StreamDescription map[uint64]*StreamDescriptionItem
+
+type StreamDescriptionItem struct {
+	Name string
+	*StreamDescription
+}
 
 var (
-	mh codec.MsgpackHandle
-	h  = &mh
+	EmptyDescription     *StreamDescription = &StreamDescription{}
+	RecursiveDescription *StreamDescription = nil
 )
 
-const (
-	HandshakeType = iota
-	HeartbeatType
-	TerminateType
-	InvokeType
-	ChunkType
-	ErrorType
-	ChokeType
-)
-
-func getEventName(msg *asio.Message) (string, bool) {
-	switch event := msg.Payload[0].(type) {
-	case string:
-		return event, true
-	case []uint8:
-		return string(event), true
+func (d *DispatchMap) Methods() []string {
+	var methods []string = make([]string, 0)
+	for _, v := range *d {
+		methods = append(methods, v.Name)
 	}
-	return "", false
+	return methods
 }
 
-// ToDo: find out if sync.Pool may give
-// profit to create messages
-
-func NewHandshake(id string) *asio.Message {
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: 0,
-			MsgType: HandshakeType,
-		},
-		Payload: []interface{}{id},
+func (d *DispatchMap) MethodByName(name string) (uint64, error) {
+	for i, v := range *d {
+		if v.Name == name {
+			return i, nil
+		}
 	}
-}
-
-func NewHeartbeatMessage() *asio.Message {
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: 0,
-			MsgType: HeartbeatType,
-		},
-		Payload: []interface{}{},
-	}
-}
-
-func NewInvoke(session uint64, event string) *asio.Message {
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: session,
-			MsgType: InvokeType,
-		},
-		Payload: []interface{}{event},
-	}
-}
-
-func NewChunk(session uint64, data interface{}) *asio.Message {
-	var res []byte
-	codec.NewEncoderBytes(&res, h).Encode(data)
-
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: session,
-			MsgType: ChunkType,
-		},
-		Payload: []interface{}{res},
-	}
-}
-
-func NewError(session uint64, code int, message string) *asio.Message {
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: session,
-			MsgType: ErrorType,
-		},
-		Payload: []interface{}{code, message},
-	}
-}
-
-func NewChoke(session uint64) *asio.Message {
-	return &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: session,
-			MsgType: ChokeType,
-		},
-		Payload: []interface{}{},
-	}
+	return 0, fmt.Errorf("no `%s` method", name)
 }
