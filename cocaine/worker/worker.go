@@ -25,19 +25,23 @@ type RequestStream interface {
 	Close()
 }
 
+type Request interface {
+	Read() chan *asio.Message
+}
+
 type ResponseStream interface {
 	Write(data interface{})
 	ErrorMsg(code int, message string)
 	Close()
 }
 
-type EventHandler func(RequestStream, ResponseStream)
+type EventHandler func(Request, ResponseStream)
 
 // Performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
 type Worker struct {
 	// Connection to cocaine-runtime
-	asio.SocketIO
+	conn asio.SocketIO
 	// Id to introduce myself to cocaine-runtime
 	id string
 	// Each tick we shoud send a heartbeat as keep-alive
@@ -71,10 +75,10 @@ func NewWorker() (*Worker, error) {
 	return newWorker(sock, workerID)
 }
 
-func newWorker(sock asio.SocketIO, id string) (*Worker, error) {
+func newWorker(conn asio.SocketIO, id string) (*Worker, error) {
 	w := &Worker{
-		SocketIO: sock,
-		id:       id,
+		conn: conn,
+		id:   id,
 
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
@@ -121,7 +125,7 @@ func (w *Worker) Stop() {
 	}
 
 	close(w.stopped)
-	w.SocketIO.Close()
+	w.conn.Close()
 }
 
 func (w *Worker) isStopped() bool {
@@ -140,8 +144,11 @@ func (w *Worker) loop() {
 
 	for {
 		select {
-		case msg := <-w.Read():
-			w.onMessage(msg)
+		case msg, ok := <-w.conn.Read():
+			if ok {
+				// otherwise the connection is closed
+				w.onMessage(msg)
+			}
 
 		case <-w.heartbeatTimer.C:
 			// Reset (start) disown & heartbeat timers
@@ -153,8 +160,11 @@ func (w *Worker) loop() {
 
 		// ToDo: reply directly to a connection
 		case outcoming := <-w.fromHandlers:
-			w.Write() <- outcoming
-
+			select {
+			case w.conn.Write() <- outcoming:
+			// Socket is in closed state, so drop data
+			case <-w.conn.IsClosed():
+			}
 		case <-w.stopped:
 			return
 		}
@@ -239,11 +249,17 @@ func (w *Worker) onTerminate() {
 // It is needed to be called only once on a startup
 // to notify runtime that we have started
 func (w *Worker) sendHandshake() {
-	w.Write() <- NewHandshake(w.id)
+	select {
+	case w.conn.Write() <- NewHandshake(w.id):
+	case <-w.conn.IsClosed():
+	}
 }
 
 func (w *Worker) onHeartbeat() {
-	w.Write() <- NewHeartbeatMessage()
+	select {
+	case w.conn.Write() <- NewHeartbeatMessage():
+	case <-w.conn.IsClosed():
+	}
 
 	// Wait for the reply until disown timeout comes
 	w.disownTimer.Reset(disownTimeout)

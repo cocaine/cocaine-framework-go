@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	"time"
+	// "time"
 
 	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
 )
@@ -30,10 +30,6 @@ func testConn() (io.ReadWriteCloser, io.ReadWriteCloser) {
 	return &pipeConn{read1, write2}, &pipeConn{read2, write1}
 }
 
-func testHandler(req RequestStream, res ResponseStream) {
-	fmt.Println("AAAA")
-}
-
 func TestWorker(t *testing.T) {
 	in, out := testConn()
 	sock, _ := asio.NewAsyncRW(out)
@@ -43,11 +39,16 @@ func TestWorker(t *testing.T) {
 		t.Fatal("unable to create worker", err)
 	}
 
-	w.On("test", testHandler)
-	go w.loop()
+	w.On("test", func(req Request, res ResponseStream) {
+		data := <-req.Read()
+		fmt.Println(data)
+		res.Write(data)
+		res.Close()
+		w.Stop()
+	})
+
 	sock2.Write() <- NewInvoke(1, "test")
 	sock2.Write() <- NewChunk(1, "Dummy")
 	sock2.Write() <- NewChoke(1)
-	time.Sleep(time.Second * 5)
-	w.Stop()
+	w.loop()
 }

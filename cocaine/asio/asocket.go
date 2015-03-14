@@ -10,8 +10,14 @@ import (
 )
 
 var (
-	mh codec.MsgpackHandle
-	h  = &mh
+	mh = codec.MsgpackHandle{
+		BasicHandle: codec.BasicHandle{
+			EncodeOptions: codec.EncodeOptions{
+				StructToArray: true,
+			},
+		},
+	}
+	h = &mh
 )
 
 type SocketIO interface {
@@ -163,7 +169,6 @@ func (sock *asyncRWSocket) Read() chan *Message {
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
-		h.StructToArray = true
 		encoder := codec.NewEncoder(sock.conn, h)
 		for incoming := range sock.upstreamBuf.out {
 			err := encoder.Encode(incoming)
