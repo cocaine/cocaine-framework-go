@@ -3,7 +3,6 @@ package worker
 import (
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
@@ -15,8 +14,10 @@ const (
 	coreConnectionTimeout = time.Second * 5
 
 	// Error codes
-	ErrorNoEventHandler = -100
-	ErrorPanicInHandler = -1
+	// no handler for requested event
+	ErrorNoEventHandler = 200
+	// panic in handler
+	ErrorPanicInHandler = 100
 )
 
 type RequestStream interface {
@@ -51,6 +52,8 @@ type Worker struct {
 	fromHandlers chan *asio.Message
 	// handlers
 	handlers map[string]EventHandler
+	// Notify Run about stop
+	stopped chan struct{}
 }
 
 // Creates new Worker
@@ -75,6 +78,8 @@ func NewWorker() (*Worker, error) {
 		sessions:     make(map[uint64]RequestStream),
 		fromHandlers: make(chan *asio.Message),
 		handlers:     make(map[string]EventHandler),
+
+		stopped: make(chan struct{}),
 	}
 
 	// NewTimer launches timer
@@ -114,8 +119,15 @@ func (w *Worker) Run(handlers map[string]EventHandler) {
 		// ToDo: reply directly to a connection
 		case outcoming := <-w.fromHandlers:
 			w.Write() <- outcoming
+
+		case <-w.stopped:
+			return
 		}
 	}
+}
+
+func (w *Worker) Stop() {
+	close(w.stopped)
 }
 
 func (w *Worker) onMessage(msg *asio.Message) {
@@ -185,11 +197,11 @@ func (w *Worker) onMessage(msg *asio.Message) {
 // A reply to heartbeat is not arrived during disownTimeout,
 // so it seems cocaine-runtime has died
 func (w *Worker) onDisown() {
-	os.Exit(0)
+	w.Close()
 }
 
 func (w *Worker) onTerminate() {
-	os.Exit(0)
+	w.Close()
 }
 
 // Send handshake message to cocaine-runtime
