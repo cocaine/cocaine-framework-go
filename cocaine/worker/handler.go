@@ -121,51 +121,58 @@ func newResponse(session uint64, toWorker chan *asio.Message) *response {
 }
 
 // Sends chunk of data to a client.
-func (response *response) Write(data interface{}) {
+func (r *response) Write(data interface{}) {
+	if r.isClosed() {
+		return
+	}
+
 	var res []byte
 	codec.NewEncoderBytes(&res, h).Encode(&data)
 
 	chunkMsg := &asio.Message{
 		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: response.session,
+			Session: r.session,
 			MsgType: ChunkType,
 		},
 		Payload: []interface{}{res},
 	}
 
-	// ToDo: check state of the stream
-	// if it is closed there will be a deadlock
-	response.fromHandler <- chunkMsg
+	r.fromHandler <- chunkMsg
 }
 
 // Notify a client about finishing the datastream.
-func (response *response) Close() {
-	chokeMsg := &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: response.session,
-			MsgType: ChokeType,
-		},
-		Payload: []interface{}{},
+func (r *response) Close() {
+	if r.isClosed() {
+		return
 	}
 
-	// ToDo: check state of the stream
-	// if it is closed there will be a deadlock
-	response.fromHandler <- chokeMsg
-	close(response.closed)
+	r.fromHandler <- NewChoke(r.session)
+	close(r.closed)
 }
 
 // Send error to a client. Specify code and message, which describes this error.
-func (response *response) ErrorMsg(code int, msg string) {
-	errorMessage := &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: response.session,
-			MsgType: ErrorType,
-		},
-		Payload: []interface{}{code, msg},
+func (r *response) ErrorMsg(code int, message string) {
+	if r.isClosed() {
+		return
 	}
 
-	// ToDo: check state of the stream
-	// if it is closed there will be a deadlock
-	response.fromHandler <- errorMessage
-	close(response.closed)
+	r.fromHandler <- NewError(
+		// current session number
+		r.session,
+		// error code
+		code,
+		// error message
+		message,
+	)
+
+	r.Close()
+}
+
+func (r *response) isClosed() bool {
+	select {
+	case <-r.closed:
+		return true
+	default:
+	}
+	return false
 }

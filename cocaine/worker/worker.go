@@ -6,8 +6,6 @@ import (
 	"os"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
 )
 
@@ -15,6 +13,10 @@ const (
 	heartbeatTimeout      = time.Second * 20
 	disownTimeout         = time.Second * 5
 	coreConnectionTimeout = time.Second * 5
+
+	// Error codes
+	ErrorNoEventHandler = -100
+	ErrorPanicInHandler = -1
 )
 
 type RequestStream interface {
@@ -36,7 +38,7 @@ type Worker struct {
 	// Connection to cocaine-runtime
 	asio.SocketIO
 	// Id to introduce myself to cocaine-runtime
-	uuid uuid.UUID
+	id string
 	// Each tick we shoud send a heartbeat as keep-alive
 	heartbeatTimer *time.Timer
 	// Timeout to receive a heartbeat reply
@@ -55,10 +57,7 @@ type Worker struct {
 func NewWorker() (*Worker, error) {
 	flag.Parse()
 
-	workerID, err := uuid.FromString(flagUUID)
-	if err != nil {
-		return nil, err
-	}
+	workerID := flagUUID
 
 	// Connect to cocaine-runtime over a unix socket
 	sock, err := asio.NewUnixConnection(flagEndpoint, coreConnectionTimeout)
@@ -68,7 +67,7 @@ func NewWorker() (*Worker, error) {
 
 	w := &Worker{
 		SocketIO: sock,
-		uuid:     workerID,
+		id:       workerID,
 
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
@@ -140,30 +139,32 @@ func (w *Worker) onMessage(msg *asio.Message) {
 
 		event, ok := getEventName(msg)
 		if !ok {
+			// corrupted message
 			return
 		}
 
-		req := newRequest()
-		resp := newResponse(currentSession, w.fromHandlers)
+		responseStream := newResponse(currentSession, w.fromHandlers)
 
-		w.sessions[currentSession] = req
-
-		if callback, ok := w.handlers[event]; ok {
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", event, r)
-						resp.ErrorMsg(1, errMsg)
-						resp.Close()
-					}
-				}()
-				callback(req, resp)
-			}()
-		} else {
-			errMsg := fmt.Sprintf("There is no event handler for %s", event)
-			resp.ErrorMsg(-100, errMsg)
-			resp.Close()
+		handler, ok := w.handlers[event]
+		if !ok {
+			errMsg := fmt.Sprintf("There is no handler for event %s", event)
+			responseStream.ErrorMsg(ErrorNoEventHandler, errMsg)
+			return
 		}
+
+		requestStream := newRequest()
+		w.sessions[currentSession] = requestStream
+
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", event, r)
+					responseStream.ErrorMsg(ErrorPanicInHandler, errMsg)
+				}
+			}()
+
+			handler(requestStream, responseStream)
+		}()
 
 	case HeartbeatType:
 		// Reply to heartbeat has been received,
@@ -195,27 +196,14 @@ func (w *Worker) onTerminate() {
 // It is needed to be called only once on a startup
 // to notify runtime that we have started
 func (w *Worker) sendHandshake() {
-	handshake := &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: 0,
-			MsgType: HandshakeType,
-		},
-		Payload: []interface{}{w.uuid},
-	}
-	w.Write() <- handshake
+	w.Write() <- NewHandshake(w.id)
 }
 
 func (w *Worker) onHeartbeat() {
-	heartbeat := &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: 0,
-			MsgType: HeartbeatType,
-		},
-		Payload: []interface{}{},
-	}
+	w.Write() <- NewHeartbeatMessage()
 
-	w.Write() <- heartbeat
-
+	// Wait for the reply until disown timeout comes
 	w.disownTimer.Reset(disownTimeout)
+	// Send next heartbeat over heartbeatTimeout
 	w.heartbeatTimer.Reset(heartbeatTimeout)
 }
