@@ -1,7 +1,14 @@
 package worker
 
 import (
+	"github.com/hashicorp/go-msgpack/codec"
+
 	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
+)
+
+var (
+	mh codec.MsgpackHandle
+	h  = &mh
 )
 
 const (
@@ -52,13 +59,16 @@ func NewInvoke(session uint64, event string) *asio.Message {
 	}
 }
 
-func NewChunk(session uint64, payload []interface{}) *asio.Message {
+func NewChunk(session uint64, data interface{}) *asio.Message {
+	var res []byte
+	codec.NewEncoderBytes(&res, h).Encode(data)
+
 	return &asio.Message{
 		CommonMessageInfo: asio.CommonMessageInfo{
 			Session: session,
 			MsgType: ChunkType,
 		},
-		Payload: payload,
+		Payload: []interface{}{res},
 	}
 }
 

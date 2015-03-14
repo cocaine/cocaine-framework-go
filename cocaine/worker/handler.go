@@ -1,14 +1,7 @@
 package worker
 
 import (
-	"github.com/hashicorp/go-msgpack/codec"
-
 	"github.com/cocaine/cocaine-framework-go/cocaine/asio"
-)
-
-var (
-	mh codec.MsgpackHandle
-	h  = &mh
 )
 
 func loop(input <-chan *asio.Message, output chan *asio.Message, onclose <-chan struct{}) {
@@ -126,18 +119,7 @@ func (r *response) Write(data interface{}) {
 		return
 	}
 
-	var res []byte
-	codec.NewEncoderBytes(&res, h).Encode(&data)
-
-	chunkMsg := &asio.Message{
-		CommonMessageInfo: asio.CommonMessageInfo{
-			Session: r.session,
-			MsgType: ChunkType,
-		},
-		Payload: []interface{}{res},
-	}
-
-	r.fromHandler <- chunkMsg
+	r.fromHandler <- NewChunk(r.session, data)
 }
 
 // Notify a client about finishing the datastream.
