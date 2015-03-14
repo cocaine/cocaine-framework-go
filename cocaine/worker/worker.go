@@ -97,12 +97,26 @@ func NewWorker() (*Worker, error) {
 	return w, nil
 }
 
-func (w *Worker) Run(handlers map[string]EventHandler) {
+// Bind handler for event
+func (w *Worker) On(event string, handler EventHandler) {
+	w.handlers[event] = handler
+}
 
+// Run serving loop
+func (w *Worker) Run(handlers map[string]EventHandler) {
 	for event, handler := range handlers {
-		w.handlers[event] = handler
+		w.On(event, handler)
 	}
 
+	w.loop()
+}
+
+func (w *Worker) Stop() {
+	close(w.stopped)
+	w.SocketIO.Close()
+}
+
+func (w *Worker) loop() {
 	for {
 		select {
 		case msg := <-w.Read():
@@ -124,10 +138,6 @@ func (w *Worker) Run(handlers map[string]EventHandler) {
 			return
 		}
 	}
-}
-
-func (w *Worker) Stop() {
-	close(w.stopped)
 }
 
 func (w *Worker) onMessage(msg *asio.Message) {
