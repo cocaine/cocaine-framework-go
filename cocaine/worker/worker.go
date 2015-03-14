@@ -58,6 +58,7 @@ type Worker struct {
 
 // Creates new Worker
 func NewWorker() (*Worker, error) {
+	setupFlags()
 	flag.Parse()
 
 	workerID := flagUUID
@@ -67,10 +68,13 @@ func NewWorker() (*Worker, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newWorker(sock, workerID)
+}
 
+func newWorker(sock asio.SocketIO, id string) (*Worker, error) {
 	w := &Worker{
 		SocketIO: sock,
-		id:       workerID,
+		id:       id,
 
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
@@ -112,8 +116,21 @@ func (w *Worker) Run(handlers map[string]EventHandler) {
 }
 
 func (w *Worker) Stop() {
+	if w.isStopped() {
+		return
+	}
+
 	close(w.stopped)
 	w.SocketIO.Close()
+}
+
+func (w *Worker) isStopped() bool {
+	select {
+	case <-w.stopped:
+		return true
+	default:
+	}
+	return false
 }
 
 func (w *Worker) loop() {
@@ -211,11 +228,11 @@ func (w *Worker) onMessage(msg *asio.Message) {
 // A reply to heartbeat is not arrived during disownTimeout,
 // so it seems cocaine-runtime has died
 func (w *Worker) onDisown() {
-	w.Close()
+	w.Stop()
 }
 
 func (w *Worker) onTerminate() {
-	w.Close()
+	w.Stop()
 }
 
 // Send handshake message to cocaine-runtime

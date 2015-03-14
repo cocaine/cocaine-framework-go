@@ -22,8 +22,13 @@ const (
 )
 
 func getEventName(msg *asio.Message) (string, bool) {
-	event, ok := msg.Payload[0].(string)
-	return event, ok
+	switch event := msg.Payload[0].(type) {
+	case string:
+		return event, true
+	case []uint8:
+		return string(event), true
+	}
+	return "", false
 }
 
 // ToDo: find out if sync.Pool may give

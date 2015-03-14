@@ -96,7 +96,7 @@ type asyncRWSocket struct {
 	closed        chan struct{} // broadcast channel
 }
 
-func newAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
+func NewAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
 	sock := &asyncRWSocket{
 		conn:          conn,
 		upstreamBuf:   newAsyncBuf(),
@@ -128,7 +128,7 @@ func newAsyncConnection(family string, address string, timeout time.Duration) (S
 	if err != nil {
 		return nil, err
 	}
-	return newAsyncRW(conn)
+	return NewAsyncRW(conn)
 }
 
 func (sock *asyncRWSocket) Close() {
