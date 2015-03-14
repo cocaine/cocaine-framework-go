@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - 1.4
+ - 1.4
 
-script:
-  - go build -o SOMETEST github.com/cocaine/cocaine-framework-go/testapp
+install:
+ - go get -u github.com/golang/lint/golint
