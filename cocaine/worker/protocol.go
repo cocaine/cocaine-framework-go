@@ -19,6 +19,9 @@ func getEventName(msg *asio.Message) (string, bool) {
 	return event, ok
 }
 
+// ToDo: find out if sync.Pool may give
+// profit to create messages
+
 func NewHandshake(id string) *asio.Message {
 	return &asio.Message{
 		CommonMessageInfo: asio.CommonMessageInfo{
@@ -36,6 +39,26 @@ func NewHeartbeatMessage() *asio.Message {
 			MsgType: HeartbeatType,
 		},
 		Payload: []interface{}{},
+	}
+}
+
+func NewInvoke(session uint64, event string) *asio.Message {
+	return &asio.Message{
+		CommonMessageInfo: asio.CommonMessageInfo{
+			Session: session,
+			MsgType: InvokeType,
+		},
+		Payload: []interface{}{event},
+	}
+}
+
+func NewChunk(session uint64, payload []interface{}) *asio.Message {
+	return &asio.Message{
+		CommonMessageInfo: asio.CommonMessageInfo{
+			Session: session,
+			MsgType: ChunkType,
+		},
+		Payload: payload,
 	}
 }
 

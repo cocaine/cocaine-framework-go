@@ -86,14 +86,14 @@ func NewWorker() (*Worker, error) {
 	// but it should be started after
 	// we send heartbeat message
 	w.disownTimer.Stop()
+	// It will be reset in onHeartbeat()
+	// after worker runs
+	w.heartbeatTimer.Stop()
 
 	// Send handshake to notify cocaine-runtime
 	// that we have started
 	w.sendHandshake()
 
-	// Send heartbeat to notify cocaine-runtime
-	// we are ready to work
-	w.onHeartbeat()
 	return w, nil
 }
 
@@ -117,6 +117,10 @@ func (w *Worker) Stop() {
 }
 
 func (w *Worker) loop() {
+	// Send heartbeat to notify cocaine-runtime
+	// we are ready to work
+	w.onHeartbeat()
+
 	for {
 		select {
 		case msg := <-w.Read():
