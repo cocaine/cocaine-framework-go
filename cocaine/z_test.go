@@ -1,7 +1,6 @@
 package cocaine
 
 import (
-	"fmt"
 	"io"
 	"testing"
 )
@@ -56,7 +55,6 @@ func TestWorker(t *testing.T) {
 
 	w.On("test", func(req Request, res ResponseStream) {
 		data := <-req.Read()
-		fmt.Println(data)
 		res.Write(data)
 		res.Close()
 	})

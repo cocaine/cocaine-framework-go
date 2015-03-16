@@ -54,8 +54,6 @@ func TestHTTPDecoder(t *testing.T) {
 	if r.Header.Get("X-Cocaine-Service") != "Test" {
 		t.Fatalf("bad header", r.Header.Get("X-Cocaine-Service"))
 	}
-
-	t.Log(r.Header.Get("X-Cocaine-Service"))
 }
 
 func BenchmarkHTTPDecoder(b *testing.B) {

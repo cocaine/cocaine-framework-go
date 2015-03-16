@@ -1,6 +1,7 @@
 package cocaine
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"time"
@@ -16,6 +17,10 @@ const (
 	ErrorNoEventHandler = 200
 	// panic in handler
 	ErrorPanicInHandler = 100
+)
+
+var (
+	ErrDisowned = errors.New("Disowned")
 )
 
 type RequestStream interface {
@@ -109,12 +114,12 @@ func (w *Worker) On(event string, handler EventHandler) {
 }
 
 // Run serving loop
-func (w *Worker) Run(handlers map[string]EventHandler) {
+func (w *Worker) Run(handlers map[string]EventHandler) error {
 	for event, handler := range handlers {
 		w.On(event, handler)
 	}
 
-	w.loop()
+	return w.loop()
 }
 
 func (w *Worker) Stop() {
@@ -135,7 +140,8 @@ func (w *Worker) isStopped() bool {
 	return false
 }
 
-func (w *Worker) loop() {
+func (w *Worker) loop() error {
+	var err error
 	// Send heartbeat to notify cocaine-runtime
 	// we are ready to work
 	w.onHeartbeat()
@@ -155,6 +161,7 @@ func (w *Worker) loop() {
 
 		case <-w.disownTimer.C:
 			w.onDisown()
+			err = ErrDisowned
 
 		// ToDo: reply directly to a connection
 		case outcoming := <-w.fromHandlers:
@@ -164,7 +171,9 @@ func (w *Worker) loop() {
 			case <-w.conn.IsClosed():
 			}
 		case <-w.stopped:
-			return
+			// If worker is disowned
+			// err is set to ErrDisowned
+			return err
 		}
 	}
 }
