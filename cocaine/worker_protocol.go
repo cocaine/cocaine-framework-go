@@ -1,7 +1,7 @@
 package cocaine
 
 import (
-	"github.com/hashicorp/go-msgpack/codec"
+	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
 )
 
 var (
