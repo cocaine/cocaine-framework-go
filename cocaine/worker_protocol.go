@@ -1,4 +1,4 @@
-package worker
+package cocaine
 
 import (
 	"github.com/hashicorp/go-msgpack/codec"

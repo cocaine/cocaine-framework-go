@@ -6,19 +6,21 @@ import (
 	"sync"
 	"time"
 
-	"log"
-
 	"github.com/ugorji/go/codec"
 )
 
 var (
-	mh codec.MsgpackHandle
-	h  = &mh
+	mhAsocket = codec.MsgpackHandle{
+		BasicHandle: codec.BasicHandle{
+			EncodeOptions: codec.EncodeOptions{
+				StructToArray: true,
+			},
+		},
+	}
+	hAsocket = &mhAsocket
 )
 
-var _ = log.Println
-
-type socketIO interface {
+type SocketIO interface {
 	Read() chan *Message
 	Write() chan *Message
 	IsClosed() <-chan struct{}
@@ -34,33 +36,39 @@ type asyncBuff struct {
 }
 
 func newAsyncBuf() *asyncBuff {
-	buf := asyncBuff{
+	buf := &asyncBuff{
 		in:   make(chan *Message),
 		out:  make(chan *Message),
 		stop: make(chan struct{})}
 
 	buf.loop()
-	return &buf
+	return buf
 }
 
 func (bf *asyncBuff) loop() {
+	bf.wg.Add(1)
 	go func() {
-		bf.wg.Add(1)
 		defer bf.wg.Done()
-		var pending []*Message // data buffer
-		var _in chan *Message  // incoming channel
-		_in = bf.in
+
+		var (
+			pending []*Message            // data buffer
+			_in     chan *Message = bf.in // incoming channel
+		)
 
 		finished := false // flag
 		for {
-			var first *Message
-			var _out chan *Message
+			var (
+				first *Message
+				_out  chan *Message
+			)
+
 			if len(pending) > 0 {
 				first = pending[0]
 				_out = bf.out
 			} else if finished {
-				break
+				return
 			}
+
 			select {
 			case incoming, ok := <-_in:
 				if ok {
@@ -91,27 +99,42 @@ type asyncRWSocket struct {
 	conn          io.ReadWriteCloser
 	upstreamBuf   *asyncBuff
 	downstreamBuf *asyncBuff
-	closed        chan struct{} //broadcast channel
+	closed        chan struct{} // broadcast channel
 }
 
-func newAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
-	sock := asyncRWSocket{
+func NewAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
+	sock := &asyncRWSocket{
 		conn:          conn,
 		upstreamBuf:   newAsyncBuf(),
 		downstreamBuf: newAsyncBuf(),
 		closed:        make(chan struct{}),
 	}
+
 	sock.readloop()
 	sock.writeloop()
-	return &sock, nil
+
+	return sock, nil
 }
 
-func newAsyncConnection(family string, address string, timeout time.Duration) (*asyncRWSocket, error) {
-	conn, err := net.DialTimeout(family, address, timeout)
+func NewUnixConnection(address string, timeout time.Duration) (SocketIO, error) {
+	return newAsyncConnection("unix", address, timeout)
+}
+
+func NewTCPConnection(address string, timeout time.Duration) (SocketIO, error) {
+	return newAsyncConnection("tcp", address, timeout)
+}
+
+func newAsyncConnection(family string, address string, timeout time.Duration) (SocketIO, error) {
+	dialer := net.Dialer{
+		Timeout:   timeout,
+		DualStack: true,
+	}
+
+	conn, err := dialer.Dial(family, address)
 	if err != nil {
 		return nil, err
 	}
-	return newAsyncRW(conn)
+	return NewAsyncRW(conn)
 }
 
 func (sock *asyncRWSocket) Close() {
@@ -123,6 +146,7 @@ func (sock *asyncRWSocket) Close() {
 func (sock *asyncRWSocket) close() {
 	sock.Lock()
 	defer sock.Unlock()
+
 	select {
 	case <-sock.closed: // Already closed
 	default:
@@ -145,8 +169,7 @@ func (sock *asyncRWSocket) Read() chan *Message {
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
-		h.StructToArray = true
-		encoder := codec.NewEncoder(sock.conn, h)
+		encoder := codec.NewEncoder(sock.conn, hAsocket)
 		for incoming := range sock.upstreamBuf.out {
 			err := encoder.Encode(incoming)
 			if err != nil {
@@ -159,7 +182,7 @@ func (sock *asyncRWSocket) writeloop() {
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		decoder := codec.NewDecoder(sock.conn, h)
+		decoder := codec.NewDecoder(sock.conn, hAsocket)
 		for {
 			var message *Message
 			err := decoder.Decode(&message)

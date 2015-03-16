@@ -24,6 +24,6 @@ vet:
 
 test:
 	@echo "+ $@"
-	@go test -v -cover -race github.com/cocaine/cocaine-framework-go/cocaine/worker
+	@go test -v -cover -race github.com/cocaine/cocaine-framework-go/cocaine
 
 

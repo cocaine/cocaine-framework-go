@@ -1,4 +1,4 @@
-package worker
+package cocaine
 
 func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
 	var (
