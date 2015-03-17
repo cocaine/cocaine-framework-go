@@ -1,50 +1,5 @@
 package cocaine
 
-func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
-	var (
-		pending []*Message
-		closed  <-chan struct{} = onclose
-	)
-
-	for {
-		var (
-			out   chan *Message
-			first *Message
-		)
-
-		if len(pending) > 0 {
-			// if we have data to send,
-			// pick the first element from the queue
-			// and unlock `out case` in select
-			// Othrewise `out` is nil
-			first = pending[0]
-			out = output
-		} else if closed == nil {
-			// Pending queue is empty
-			// and there will be no incoming data
-			// as request is closed
-			return
-		}
-
-		select {
-		case incoming := <-input:
-			pending = append(pending, incoming)
-
-		case out <- first:
-			// help GC a bit
-			pending[0] = nil
-			// it should be done
-			// without memory copy/allocate
-			pending = pending[1:]
-
-		case <-closed:
-			// It will be triggered on
-			// the next iteration as closed is closed
-			closed = nil
-		}
-	}
-}
-
 type request struct {
 	fromWorker chan *Message
 	toHandler  chan *Message
@@ -70,11 +25,11 @@ func newRequest() *request {
 	return request
 }
 
-func (request *request) Read() chan *Message {
+func (request *request) Read() <-chan *Message {
 	return request.toHandler
 }
 
-func (request *request) Push(msg *Message) {
+func (request *request) push(msg *Message) {
 	request.fromWorker <- msg
 }
 
@@ -153,4 +108,49 @@ func (r *response) isClosed() bool {
 	default:
 	}
 	return false
+}
+
+func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
+	var (
+		pending []*Message
+		closed  <-chan struct{} = onclose
+	)
+
+	for {
+		var (
+			out   chan *Message
+			first *Message
+		)
+
+		if len(pending) > 0 {
+			// if we have data to send,
+			// pick the first element from the queue
+			// and unlock `out case` in select
+			// Othrewise `out` is nil
+			first = pending[0]
+			out = output
+		} else if closed == nil {
+			// Pending queue is empty
+			// and there will be no incoming data
+			// as request is closed
+			return
+		}
+
+		select {
+		case incoming := <-input:
+			pending = append(pending, incoming)
+
+		case out <- first:
+			// help GC a bit
+			pending[0] = nil
+			// it should be done
+			// without memory copy/allocate
+			pending = pending[1:]
+
+		case <-closed:
+			// It will be triggered on
+			// the next iteration as closed is closed
+			closed = nil
+		}
+	}
 }

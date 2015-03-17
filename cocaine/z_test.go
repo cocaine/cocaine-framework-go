@@ -1,7 +1,9 @@
 package cocaine
 
 import (
+	"fmt"
 	"io"
+	"net/http"
 	"testing"
 )
 
@@ -53,19 +55,29 @@ func TestWorker(t *testing.T) {
 		t.Fatal("unable to create worker", err)
 	}
 
-	w.On("test", func(req Request, res ResponseStream) {
-		data := <-req.Read()
-		res.Write(data)
-		res.Close()
-	})
+	handlers := map[string]EventHandler{
+		"test": func(req Request, res Response) {
+			data := <-req.Read()
+			res.Write(data)
+			res.Close()
+		},
+		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "OK")
+		}),
+	}
+
 	go func() {
-		w.loop()
+		w.Run(handlers)
 		close(onStop)
 	}()
 
 	sock2.Write() <- NewInvoke(testSession, "test")
 	sock2.Write() <- NewChunk(testSession, "Dummy")
 	sock2.Write() <- NewChoke(testSession)
+
+	sock2.Write() <- NewInvoke(testSession+1, "http")
+	sock2.Write() <- NewChunk(testSession+1, req)
+	sock2.Write() <- NewChoke(testSession + 1)
 
 	// handshake
 	eHandshake := <-sock2.Read()
@@ -87,10 +99,18 @@ func TestWorker(t *testing.T) {
 	eHeartbeat := <-sock2.Read()
 	checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
 
+	// test event
 	eChunk := <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession, ChunkType)
-
 	eChoke := <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession, ChokeType)
+
+	// http event
+	eChunk = <-sock2.Read()
+	checkTypeAndSession(t, eChunk, testSession+1, ChunkType)
+	eChunk = <-sock2.Read()
+	checkTypeAndSession(t, eChunk, testSession+1, ChunkType)
+	eChoke = <-sock2.Read()
+	checkTypeAndSession(t, eChoke, testSession+1, ChokeType)
 	<-onStop
 }

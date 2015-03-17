@@ -24,12 +24,12 @@ var (
 )
 
 type RequestStream interface {
-	Push(*Message)
+	push(*Message)
 	Close()
 }
 
 type Request interface {
-	Read() chan *Message
+	Read() <-chan *Message
 }
 
 type ResponseStream interface {
@@ -38,7 +38,9 @@ type ResponseStream interface {
 	Close()
 }
 
-type EventHandler func(Request, ResponseStream)
+type Response ResponseStream
+
+type EventHandler func(Request, Response)
 
 // Performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
@@ -182,7 +184,7 @@ func (w *Worker) onMessage(msg *Message) {
 	switch msg.MsgType {
 	case ChunkType:
 		if reqStream, ok := w.sessions[msg.Session]; ok {
-			reqStream.Push(msg)
+			reqStream.push(msg)
 		}
 
 	case ChokeType:
