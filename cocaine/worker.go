@@ -29,7 +29,7 @@ type RequestStream interface {
 }
 
 type Request interface {
-	Read() <-chan *Message
+	Read(timeout ...time.Duration) ([]byte, error)
 }
 
 type ResponseStream interface {

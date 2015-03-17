@@ -112,21 +112,41 @@ func CocaineHeaderToHttpHeader(hdr Headers) http.Header {
 
 func WrapHandler(handler http.Handler) EventHandler {
 	var wrapper = func(request Request, response Response) {
-		msg := <-request.Read()
-		if httpRequest, err := UnpackProxyRequest(msg.Payload[0].([]byte)); err != nil {
-			response.Write(WriteHead(400, Headers{}))
-		} else {
-			w := &ResponseWriter{
-				cRes:          response,
-				req:           httpRequest,
-				handlerHeader: make(http.Header),
-				contentLength: -1,
-				wroteHeader:   false,
+		defer response.Close()
+
+		// Read the first chunk
+		// It consists of method, uri, httpversion, headers, body.
+		// They are packed by msgpack
+		msg, err := request.Read()
+		if err != nil {
+			if IsTimeout(err) {
+				response.Write(WriteHead(http.StatusRequestTimeout, Headers{}))
+				response.Write("request was not received during a timeout")
+				return
 			}
-			handler.ServeHTTP(w, httpRequest)
-			w.finishRequest()
+
+			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
+			response.Write("cannot process request " + err.Error())
+			return
 		}
-		response.Close()
+
+		httpRequest, err := UnpackProxyRequest(msg)
+		if err != nil {
+			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
+			response.Write("malformed request")
+			return
+		}
+
+		w := &ResponseWriter{
+			cRes:          response,
+			req:           httpRequest,
+			handlerHeader: make(http.Header),
+			contentLength: -1,
+			wroteHeader:   false,
+		}
+
+		handler.ServeHTTP(w, httpRequest)
+		w.finishRequest()
 	}
 
 	return wrapper

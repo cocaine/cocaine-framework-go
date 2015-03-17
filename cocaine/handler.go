@@ -1,9 +1,37 @@
 package cocaine
 
+import (
+	"errors"
+	"time"
+)
+
 type request struct {
 	fromWorker chan *Message
 	toHandler  chan *Message
 	closed     chan struct{}
+}
+
+var (
+	ErrStreamIsClosed = &ClosedError{}
+	ErrTimeout        = &TimeoutError{}
+
+	ErrBadPayload = errors.New("Payload is not []byte")
+)
+
+type TimeoutError struct{}
+
+func (t *TimeoutError) Error() string { return "TimeoutError" }
+
+type ClosedError struct{}
+
+func (t *ClosedError) Error() string { return "Stream is closed" }
+
+func IsTimeout(err error) bool {
+	switch err.(type) {
+	case *TimeoutError:
+		return true
+	}
+	return false
 }
 
 func newRequest() *request {
@@ -25,8 +53,28 @@ func newRequest() *request {
 	return request
 }
 
-func (request *request) Read() <-chan *Message {
-	return request.toHandler
+// ToDo: context?
+func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
+	var onTimeout <-chan time.Time
+
+	if len(timeout) > 0 {
+		onTimeout = time.After(timeout[0])
+	}
+
+	select {
+	case msg, ok := <-request.toHandler:
+		if !ok {
+			return nil, ErrStreamIsClosed
+		}
+
+		if result, isByte := msg.Payload[0].([]byte); isByte {
+			return result, nil
+		} else {
+			return nil, ErrBadPayload
+		}
+	case <-onTimeout:
+		return nil, ErrTimeout
+	}
 }
 
 func (request *request) push(msg *Message) {

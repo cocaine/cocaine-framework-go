@@ -57,7 +57,7 @@ func TestWorker(t *testing.T) {
 
 	handlers := map[string]EventHandler{
 		"test": func(req Request, res Response) {
-			data := <-req.Read()
+			data, _ := req.Read()
 			res.Write(data)
 			res.Close()
 		},
