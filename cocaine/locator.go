@@ -7,7 +7,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/ugorji/go/codec"
+	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
 )
 
 type Endpoint struct {

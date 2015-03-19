@@ -2,13 +2,14 @@ package cocaine
 
 import (
 	"bytes"
-	"github.com/ugorji/go/codec"
+	"compress/gzip"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"reflect"
-	"fmt"
-	"compress/gzip"
-	"io"
-	"errors"
+
+	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
 )
 
 type Headers [][2]string
@@ -106,19 +107,18 @@ func WrapHandler(handler http.Handler, logger *Logger) EventHandler {
 			panic(fmt.Sprintf("Could not initialize logger due to error: %v", err))
 		}
 	}
-	var wrapper = func (request *Request, response *Response) {
+	var wrapper = func(request *Request, response *Response) {
 		if httpRequest, err := UnpackProxyRequest(<-request.Read()); err != nil {
 			logger.Errf("Could not unpack http request due to error %v", err)
 			response.Write(WriteHead(400, Headers{}))
 		} else {
 			w := &ResponseWriter{
-				cRes: response,
-				req: httpRequest,
+				cRes:          response,
+				req:           httpRequest,
 				handlerHeader: make(http.Header),
 				contentLength: -1,
-				wroteHeader: false,
-				logger: logger,
-
+				wroteHeader:   false,
+				logger:        logger,
 			}
 			handler.ServeHTTP(w, httpRequest)
 			w.finishRequest()
@@ -160,7 +160,7 @@ func WrapHandlerFunc(hf http.HandlerFunc, logger *Logger) EventHandler {
 
 func WrapHandleFuncs(hfs map[string]http.HandlerFunc, logger *Logger) (handlers map[string]EventHandler) {
 	handlers = map[string]EventHandler{}
-	for key, hf := range(hfs){
+	for key, hf := range hfs {
 		handlers[key] = WrapHandlerFunc(hf, logger)
 	}
 	return
@@ -170,7 +170,7 @@ func WrapHandleFuncs(hfs map[string]http.HandlerFunc, logger *Logger) (handlers 
 // so we need to close it manually. This decorator makes it
 type decompressReaderCloser struct {
 	decompressReader io.Closer
-	body io.Closer
+	body             io.Closer
 }
 
 func (this decompressReaderCloser) Close() error {
