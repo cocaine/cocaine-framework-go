@@ -143,7 +143,6 @@ type Worker struct {
 	uuid            uuid.UUID
 	logger          *Logger
 	heartbeat_timer *time.Timer
-	disown_timer    *time.Timer
 	sessions        map[int64](*Request)
 	from_handlers   chan rawMessage
 	socketIO
@@ -169,12 +168,10 @@ func NewWorker() (worker *Worker, err error) {
 		uuid:            workerID,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
-		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
 		sessions:        make(map[int64](*Request)),
 		from_handlers:   make(chan rawMessage),
 		socketIO:        sock,
 	}
-	w.disown_timer.Stop()
 	w.handshake()
 	w.heartbeat()
 	worker = &w
@@ -183,6 +180,7 @@ func NewWorker() (worker *Worker, err error) {
 
 // Initializes worker in runtime as starting. Launchs an eventloop.
 func (worker *Worker) Loop(bind map[string]EventHandler) {
+	notify := startDisownWatcher(DISOWN_TIMEOUT * 42)
 	for {
 		select {
 		case answer := <-worker.Read():
@@ -226,7 +224,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 				case *heartbeat:
 					worker.logger.Debug("Receive heartbeat. Stop disown_timer")
-					worker.disown_timer.Stop()
+					notify <- struct{}{}
 
 				case *terminateStruct:
 					worker.logger.Info("Receive terminate")
@@ -240,10 +238,6 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 			worker.logger.Debug("Send heartbeat")
 			worker.heartbeat()
 
-		case <-worker.disown_timer.C:
-			worker.logger.Info("Disowned")
-			os.Exit(0)
-
 		case outcoming := <-worker.from_handlers:
 			worker.Write() <- outcoming
 		}
@@ -253,11 +247,29 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 func (worker *Worker) heartbeat() {
 	heartbeat := heartbeat{messageInfo{HEARTBEAT, 0}}
 	worker.Write() <- packMsg(&heartbeat)
-	worker.disown_timer.Reset(DISOWN_TIMEOUT)
 	worker.heartbeat_timer.Reset(HEARTBEAT_TIMEOUT)
 }
 
 func (worker *Worker) handshake() {
 	handshake := handshakeStruct{messageInfo{HANDSHAKE, 0}, worker.uuid}
 	worker.Write() <- packMsg(&handshake)
+}
+
+func startDisownWatcher(timeout time.Duration) chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-time.After(timeout):
+				os.Exit(0)
+			case _, opened := <-ch:
+				if !opened {
+					// closing the channel
+					// means stopping the watcher
+					return
+				}
+			}
+		}
+	}()
+	return ch
 }
