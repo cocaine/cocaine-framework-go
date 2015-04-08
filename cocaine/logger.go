@@ -50,7 +50,7 @@ func (f *fallbackLogger) Warn(message ...interface{}) {
 }
 
 func (f *fallbackLogger) Warnf(format string, args ...interface{}) {
-	log.Printf("[ERROR] %s", fmt.Sprintf(format, args...))
+	log.Printf("[WARN] %s", fmt.Sprintf(format, args...))
 }
 
 func (f *fallbackLogger) Info(message ...interface{}) {
@@ -58,7 +58,7 @@ func (f *fallbackLogger) Info(message ...interface{}) {
 }
 
 func (f *fallbackLogger) Infof(format string, args ...interface{}) {
-	log.Printf("[ERROR] %s", fmt.Sprintf(format, args...))
+	log.Printf("[INFO] %s", fmt.Sprintf(format, args...))
 }
 
 func (f *fallbackLogger) Debug(message ...interface{}) {
@@ -66,7 +66,7 @@ func (f *fallbackLogger) Debug(message ...interface{}) {
 }
 
 func (f *fallbackLogger) Debugf(format string, args ...interface{}) {
-	log.Printf("[ERROR] %s", fmt.Sprintf(format, args...))
+	log.Printf("[DEBUG] %s", fmt.Sprintf(format, args...))
 }
 
 func (f *fallbackLogger) Verbosity() int {
