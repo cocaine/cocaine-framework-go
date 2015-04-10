@@ -34,3 +34,10 @@ func TestASocketDrain(t *testing.T) {
 	assert.Equal(t, expected, count)
 	<-exit
 }
+
+func TestASocketConnect(t *testing.T) {
+	_, err := NewTCPConnection("128.0.0.1:45000", time.Second)
+	assert.Error(t, err)
+	_, err = NewUnixConnection("unix.sock", time.Second)
+	assert.Error(t, err)
+}

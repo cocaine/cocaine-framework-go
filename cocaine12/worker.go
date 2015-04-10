@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	heartbeatTimeout      = time.Second * 20
+	heartbeatTimeout      = time.Second * 10
 	disownTimeout         = time.Second * 5
 	coreConnectionTimeout = time.Second * 5
 
@@ -241,6 +241,7 @@ func (w *Worker) onMessage(msg *Message) {
 
 	default:
 		// Invalid message
+		fmt.Printf("invalid message type: %d, message %v", msg.MsgType, msg)
 	}
 }
 

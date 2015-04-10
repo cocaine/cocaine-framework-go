@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 type pipeConn struct {
@@ -68,12 +69,19 @@ func TestWorker(t *testing.T) {
 		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "OK")
 		}),
+		"panic": func(req Request, res Response) {
+			panic("PANIC")
+		},
 	}
 
 	go func() {
 		w.Run(handlers)
 		close(onStop)
 	}()
+
+	corrupted := NewInvoke(testSession+100, "AAA")
+	corrupted.Payload = []interface{}{nil}
+	sock2.Write() <- corrupted
 
 	sock2.Write() <- NewInvoke(testSession, "test")
 	sock2.Write() <- NewChunk(testSession, "Dummy")
@@ -86,6 +94,14 @@ func TestWorker(t *testing.T) {
 	sock2.Write() <- NewInvoke(testSession+2, "error")
 	sock2.Write() <- NewChunk(testSession+2, "Dummy")
 	sock2.Write() <- NewChoke(testSession + 2)
+
+	sock2.Write() <- NewInvoke(testSession+3, "BadEvent")
+	sock2.Write() <- NewChunk(testSession+3, "Dummy")
+	sock2.Write() <- NewChoke(testSession + 3)
+
+	sock2.Write() <- NewInvoke(testSession+4, "panic")
+	sock2.Write() <- NewChunk(testSession+4, "Dummy")
+	sock2.Write() <- NewChoke(testSession + 4)
 
 	// handshake
 	eHandshake := <-sock2.Read()
@@ -126,5 +142,83 @@ func TestWorker(t *testing.T) {
 	checkTypeAndSession(t, eError, testSession+2, ErrorType)
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+2, ChokeType)
+
+	// badevent
+	eError = <-sock2.Read()
+	checkTypeAndSession(t, eError, testSession+3, ErrorType)
+	eChoke = <-sock2.Read()
+	checkTypeAndSession(t, eChoke, testSession+3, ChokeType)
+
+	// panic
+	eError = <-sock2.Read()
+	checkTypeAndSession(t, eError, testSession+4, ErrorType)
+	eChoke = <-sock2.Read()
+	checkTypeAndSession(t, eChoke, testSession+4, ChokeType)
 	<-onStop
+	w.Stop()
+}
+
+func TestWorkerTermination(t *testing.T) {
+	const (
+		testId = "uuid"
+	)
+
+	var onStop = make(chan struct{})
+
+	in, out := testConn()
+	sock, _ := NewAsyncRW(out)
+	sock2, _ := NewAsyncRW(in)
+	w, err := newWorker(sock, testId)
+	if err != nil {
+		t.Fatal("unable to create worker", err)
+	}
+
+	go func() {
+		w.Run(map[string]EventHandler{})
+		close(onStop)
+	}()
+
+	eHandshake := <-sock2.Read()
+	checkTypeAndSession(t, eHandshake, 0, HandshakeType)
+	eHeartbeat := <-sock2.Read()
+	checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
+
+	sock2.Write() <- NewHeartbeatMessage()
+
+	terminate := &Message{
+		CommonMessageInfo: CommonMessageInfo{
+			Session: 0,
+			MsgType: TerminateType,
+		},
+		Payload: []interface{}{100, "TestTermination"},
+	}
+
+	corrupted := &Message{
+		CommonMessageInfo: CommonMessageInfo{
+			Session: 0,
+			MsgType: 9999,
+		},
+		Payload: []interface{}{100, "TestTermination"},
+	}
+
+	sock2.Write() <- corrupted
+
+	select {
+	case <-onStop:
+		// an unexpected disown exit
+		t.Fatalf("unexpected exit")
+	case <-time.After(heartbeatTimeout + time.Second):
+		t.Fatalf("unexpected timeout")
+	case eHeartbeat := <-sock2.Read():
+		checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
+	}
+
+	sock2.Write() <- terminate
+
+	select {
+	case <-onStop:
+		// a termination exit
+	case <-time.After(disownTimeout):
+		t.Fatalf("unexpected exit")
+	}
 }
