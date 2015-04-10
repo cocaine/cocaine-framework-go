@@ -1,4 +1,4 @@
-package cocaine
+package cocaine12
 
 import (
 	"io"
@@ -28,18 +28,20 @@ type SocketIO interface {
 }
 
 type asyncBuff struct {
-	wg      sync.WaitGroup
-	in, out chan *Message
-	// ToDO: it should be chan time.Duration
-	// to implement the drain method with a timeout
-	stop chan struct{}
+	wg sync.WaitGroup
+
+	in  chan *Message
+	out chan *Message
+
+	stop chan (<-chan time.Time)
 }
 
 func newAsyncBuf() *asyncBuff {
 	buf := &asyncBuff{
 		in:   make(chan *Message),
 		out:  make(chan *Message),
-		stop: make(chan struct{})}
+		stop: make(chan (<-chan time.Time)),
+	}
 
 	buf.loop()
 	return buf
@@ -47,50 +49,100 @@ func newAsyncBuf() *asyncBuff {
 
 func (bf *asyncBuff) loop() {
 	bf.wg.Add(1)
+
 	go func() {
 		defer bf.wg.Done()
 
+		// Notify a receiver
+		defer close(bf.out)
+
 		var (
-			pending []*Message            // data buffer
-			_in     chan *Message = bf.in // incoming channel
+			// buffer for messages
+			pending []*Message
+
+			// it should be read until closed
+			// to get all messages from a sender
+			input = bf.in
+
+			// if <-chan time.Time is received we have to wait the buffer drainig
+			// if closed return immediatly
+			stopped = bf.stop
+
+			quitAfterTimeout <-chan time.Time
+
+			// empty buffer & the input is closed
+			finished = false
 		)
 
-		finished := false // flag
 		for {
 			var (
-				first *Message
-				_out  chan *Message
+				candidate *Message
+				out       chan *Message
 			)
 
 			if len(pending) > 0 {
-				first = pending[0]
-				_out = bf.out
+				// mark the first message as a candidate to be sent
+				// and unlock the sending state
+				candidate = pending[0]
+				out = bf.out
 			} else if finished {
+				// message queue is empty and
+				// no more messages are expected
 				return
 			}
 
 			select {
-			case incoming, ok := <-_in:
-				if ok {
+			// get a message from a sender
+			case incoming, open := <-input:
+				if open {
 					pending = append(pending, incoming)
 				} else {
+					// Set the flag
+					// Unset channel to lock the case
 					finished = true
-					_in = nil
+					input = nil
 				}
-			case _out <- first:
+
+			// send the first message from the queue to a reveiver
+			case out <- candidate:
 				pending = pending[1:]
-			case <-bf.stop:
-				close(bf.out) // Notify receiver
+
+			case timeoutChan, open := <-stopped:
+				if !open {
+					return
+				}
+
+				// Disable this case
+				// to protect from Stop() after Drain()
+				stopped = nil
+				quitAfterTimeout = timeoutChan
+
+			// it's usually nil channel, but
+			// it can be set using passing a chan time.Time via stopped
+			case <-quitAfterTimeout:
 				return
 			}
 		}
 	}()
 }
 
-func (bf *asyncBuff) Stop() (res bool) {
+// Stop stops a loop which is handling messages in the buffer
+// It is prohibited to call Drain afer Stop
+func (bf *asyncBuff) Stop() error {
 	close(bf.stop)
 	bf.wg.Wait()
-	return
+	return nil
+}
+
+// Drain waits for the duration to let the buffer send pending messages.
+// It is prohibited to call Drain after Stop
+func (bf *asyncBuff) Drain(d time.Duration) error {
+	var timeoutChan = time.After(d)
+	select {
+	case bf.stop <- timeoutChan:
+	case <-timeoutChan:
+	}
+	return bf.Stop()
 }
 
 // Biderectional socket

@@ -1,4 +1,4 @@
-package cocaine
+package cocaine12
 
 import (
 	"fmt"

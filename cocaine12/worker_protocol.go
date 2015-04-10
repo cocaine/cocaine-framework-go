@@ -1,4 +1,4 @@
-package cocaine
+package cocaine12
 
 import (
 	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"

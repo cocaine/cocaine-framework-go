@@ -14,7 +14,7 @@ fmt:
 
 lint:
 	@echo "+ $@"
-	@test -z "$$(golint ./cocaine12/... | grep -v Godeps/_workspace/src/ | tee /dev/stderr)"
+	@test -z "$$(golint ./cocaine12/... | grep -v Godeps/_workspace/src/ | grep -v cocaine12/old | tee /dev/stderr)"
 
 
 vet:
