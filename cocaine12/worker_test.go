@@ -61,6 +61,10 @@ func TestWorker(t *testing.T) {
 			res.Write(data)
 			res.Close()
 		},
+		"error": func(req Request, res Response) {
+			_, _ = req.Read()
+			res.ErrorMsg(-100, "dummyError")
+		},
 		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "OK")
 		}),
@@ -78,6 +82,10 @@ func TestWorker(t *testing.T) {
 	sock2.Write() <- NewInvoke(testSession+1, "http")
 	sock2.Write() <- NewChunk(testSession+1, req)
 	sock2.Write() <- NewChoke(testSession + 1)
+
+	sock2.Write() <- NewInvoke(testSession+2, "error")
+	sock2.Write() <- NewChunk(testSession+2, "Dummy")
+	sock2.Write() <- NewChoke(testSession + 2)
 
 	// handshake
 	eHandshake := <-sock2.Read()
@@ -112,5 +120,11 @@ func TestWorker(t *testing.T) {
 	checkTypeAndSession(t, eChunk, testSession+1, ChunkType)
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+1, ChokeType)
+
+	// error event
+	eError := <-sock2.Read()
+	checkTypeAndSession(t, eError, testSession+2, ErrorType)
+	eChoke = <-sock2.Read()
+	checkTypeAndSession(t, eChoke, testSession+2, ChokeType)
 	<-onStop
 }
