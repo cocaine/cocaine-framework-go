@@ -19,9 +19,9 @@ type CommonMessageInfo struct {
 
 // Description of service endpoint
 type EndpointItem struct {
-	//Service ip address
+	// Service ip address
 	IP string
-	//Service port
+	// Service port
 	Port uint64
 }
 
@@ -50,7 +50,7 @@ var (
 )
 
 func (d *DispatchMap) Methods() []string {
-	var methods []string = make([]string, 0)
+	var methods []string = make([]string, 0, len(*d))
 	for _, v := range *d {
 		methods = append(methods, v.Name)
 	}
