@@ -20,10 +20,12 @@ type ResponseWriter struct {
 	wroteHeader bool
 }
 
+// Header returns the header map that will be sent by WriteHeader
 func (w *ResponseWriter) Header() http.Header {
 	return w.handlerHeader
 }
 
+// WriteHeader sends an HTTP response header with status code
 func (w *ResponseWriter) WriteHeader(code int) {
 	if w.wroteHeader {
 		return
@@ -41,7 +43,7 @@ func (w *ResponseWriter) WriteHeader(code int) {
 	}
 
 	w.cRes.Write(
-		WriteHead(code, HttpHeaderToCocaineHeader(w.handlerHeader)),
+		WriteHead(code, headersHTTPtoCocaine(w.handlerHeader)),
 	)
 }
 
@@ -66,10 +68,12 @@ func (w *ResponseWriter) bodyAllowed() bool {
 	return w.status != http.StatusNotModified
 }
 
+// Write writes the data to the connection as part of an HTTP reply
 func (w *ResponseWriter) Write(data []byte) (n int, err error) {
 	return w.write(len(data), data, "")
 }
 
+// WriteString writes the string to the connection as part of an HTTP reply
 func (w *ResponseWriter) WriteString(data string) (n int, err error) {
 	return w.write(len(data), nil, data)
 }
@@ -96,8 +100,8 @@ func (w *ResponseWriter) write(lenData int, dataB []byte, dataS string) (n int, 
 	if dataB != nil {
 		w.cRes.Write(dataB)
 		return len(dataB), nil
-	} else {
-		w.cRes.Write(dataS)
-		return len(dataS), nil
 	}
+
+	w.cRes.Write(dataS)
+	return len(dataS), nil
 }

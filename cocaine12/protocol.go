@@ -17,7 +17,7 @@ type CommonMessageInfo struct {
 	MsgType uint64
 }
 
-// Description of service endpoint
+// EndpointItem is one of possible endpoints of a service
 type EndpointItem struct {
 	// Service ip address
 	IP string
@@ -45,12 +45,12 @@ type StreamDescriptionItem struct {
 }
 
 var (
-	EmptyDescription     *StreamDescription = &StreamDescription{}
-	RecursiveDescription *StreamDescription = nil
+	EmptyDescription     = &StreamDescription{}
+	RecursiveDescription *StreamDescription
 )
 
 func (d *DispatchMap) Methods() []string {
-	var methods []string = make([]string, 0, len(*d))
+	var methods = make([]string, 0, len(*d))
 	for _, v := range *d {
 		methods = append(methods, v.Name)
 	}

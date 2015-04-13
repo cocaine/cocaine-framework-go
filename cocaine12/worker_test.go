@@ -40,7 +40,7 @@ func checkTypeAndSession(t *testing.T, msg *Message, eSession uint64, eType uint
 
 func TestWorker(t *testing.T) {
 	const (
-		testId      = "uuid"
+		testID      = "uuid"
 		testSession = 10
 	)
 
@@ -49,9 +49,9 @@ func TestWorker(t *testing.T) {
 	)
 
 	in, out := testConn()
-	sock, _ := NewAsyncRW(out)
-	sock2, _ := NewAsyncRW(in)
-	w, err := newWorker(sock, testId)
+	sock, _ := newAsyncRW(out)
+	sock2, _ := newAsyncRW(in)
+	w, err := newWorker(sock, testID)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
@@ -79,41 +79,41 @@ func TestWorker(t *testing.T) {
 		close(onStop)
 	}()
 
-	corrupted := NewInvoke(testSession+100, "AAA")
+	corrupted := newInvoke(testSession+100, "AAA")
 	corrupted.Payload = []interface{}{nil}
 	sock2.Write() <- corrupted
 
-	sock2.Write() <- NewInvoke(testSession, "test")
-	sock2.Write() <- NewChunk(testSession, "Dummy")
-	sock2.Write() <- NewChoke(testSession)
+	sock2.Write() <- newInvoke(testSession, "test")
+	sock2.Write() <- newChunk(testSession, "Dummy")
+	sock2.Write() <- newChoke(testSession)
 
-	sock2.Write() <- NewInvoke(testSession+1, "http")
-	sock2.Write() <- NewChunk(testSession+1, req)
-	sock2.Write() <- NewChoke(testSession + 1)
+	sock2.Write() <- newInvoke(testSession+1, "http")
+	sock2.Write() <- newChunk(testSession+1, req)
+	sock2.Write() <- newChoke(testSession + 1)
 
-	sock2.Write() <- NewInvoke(testSession+2, "error")
-	sock2.Write() <- NewChunk(testSession+2, "Dummy")
-	sock2.Write() <- NewChoke(testSession + 2)
+	sock2.Write() <- newInvoke(testSession+2, "error")
+	sock2.Write() <- newChunk(testSession+2, "Dummy")
+	sock2.Write() <- newChoke(testSession + 2)
 
-	sock2.Write() <- NewInvoke(testSession+3, "BadEvent")
-	sock2.Write() <- NewChunk(testSession+3, "Dummy")
-	sock2.Write() <- NewChoke(testSession + 3)
+	sock2.Write() <- newInvoke(testSession+3, "BadEvent")
+	sock2.Write() <- newChunk(testSession+3, "Dummy")
+	sock2.Write() <- newChoke(testSession + 3)
 
-	sock2.Write() <- NewInvoke(testSession+4, "panic")
-	sock2.Write() <- NewChunk(testSession+4, "Dummy")
-	sock2.Write() <- NewChoke(testSession + 4)
+	sock2.Write() <- newInvoke(testSession+4, "panic")
+	sock2.Write() <- newChunk(testSession+4, "Dummy")
+	sock2.Write() <- newChoke(testSession + 4)
 
 	// handshake
 	eHandshake := <-sock2.Read()
-	checkTypeAndSession(t, eHandshake, 0, HandshakeType)
+	checkTypeAndSession(t, eHandshake, 0, handshakeType)
 
 	switch uuid := eHandshake.Payload[0].(type) {
 	case string:
-		if uuid != testId {
+		if uuid != testID {
 			t.Fatal("bad uuid")
 		}
 	case []uint8:
-		if string(uuid) != testId {
+		if string(uuid) != testID {
 			t.Fatal("bad uuid")
 		}
 	default:
@@ -121,54 +121,54 @@ func TestWorker(t *testing.T) {
 	}
 
 	eHeartbeat := <-sock2.Read()
-	checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
+	checkTypeAndSession(t, eHeartbeat, 0, heartbeatType)
 
 	// test event
 	eChunk := <-sock2.Read()
-	checkTypeAndSession(t, eChunk, testSession, ChunkType)
+	checkTypeAndSession(t, eChunk, testSession, chunkType)
 	eChoke := <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession, ChokeType)
+	checkTypeAndSession(t, eChoke, testSession, chokeType)
 
 	// http event
 	eChunk = <-sock2.Read()
-	checkTypeAndSession(t, eChunk, testSession+1, ChunkType)
+	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
 	eChunk = <-sock2.Read()
-	checkTypeAndSession(t, eChunk, testSession+1, ChunkType)
+	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
 	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+1, ChokeType)
+	checkTypeAndSession(t, eChoke, testSession+1, chokeType)
 
 	// error event
 	eError := <-sock2.Read()
-	checkTypeAndSession(t, eError, testSession+2, ErrorType)
+	checkTypeAndSession(t, eError, testSession+2, errorType)
 	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+2, ChokeType)
+	checkTypeAndSession(t, eChoke, testSession+2, chokeType)
 
 	// badevent
 	eError = <-sock2.Read()
-	checkTypeAndSession(t, eError, testSession+3, ErrorType)
+	checkTypeAndSession(t, eError, testSession+3, errorType)
 	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+3, ChokeType)
+	checkTypeAndSession(t, eChoke, testSession+3, chokeType)
 
 	// panic
 	eError = <-sock2.Read()
-	checkTypeAndSession(t, eError, testSession+4, ErrorType)
+	checkTypeAndSession(t, eError, testSession+4, errorType)
 	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+4, ChokeType)
+	checkTypeAndSession(t, eChoke, testSession+4, chokeType)
 	<-onStop
 	w.Stop()
 }
 
 func TestWorkerTermination(t *testing.T) {
 	const (
-		testId = "uuid"
+		testID = "uuid"
 	)
 
 	var onStop = make(chan struct{})
 
 	in, out := testConn()
-	sock, _ := NewAsyncRW(out)
-	sock2, _ := NewAsyncRW(in)
-	w, err := newWorker(sock, testId)
+	sock, _ := newAsyncRW(out)
+	sock2, _ := newAsyncRW(in)
+	w, err := newWorker(sock, testID)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
@@ -179,16 +179,16 @@ func TestWorkerTermination(t *testing.T) {
 	}()
 
 	eHandshake := <-sock2.Read()
-	checkTypeAndSession(t, eHandshake, 0, HandshakeType)
+	checkTypeAndSession(t, eHandshake, 0, handshakeType)
 	eHeartbeat := <-sock2.Read()
-	checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
+	checkTypeAndSession(t, eHeartbeat, 0, heartbeatType)
 
-	sock2.Write() <- NewHeartbeatMessage()
+	sock2.Write() <- newHeartbeatMessage()
 
 	terminate := &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: 0,
-			MsgType: TerminateType,
+			MsgType: terminateType,
 		},
 		Payload: []interface{}{100, "TestTermination"},
 	}
@@ -210,7 +210,7 @@ func TestWorkerTermination(t *testing.T) {
 	case <-time.After(heartbeatTimeout + time.Second):
 		t.Fatalf("unexpected timeout")
 	case eHeartbeat := <-sock2.Read():
-		checkTypeAndSession(t, eHeartbeat, 0, HeartbeatType)
+		checkTypeAndSession(t, eHeartbeat, 0, heartbeatType)
 	}
 
 	sock2.Write() <- terminate

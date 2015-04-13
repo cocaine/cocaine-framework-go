@@ -16,33 +16,34 @@ var (
 	hHTTPReq  = &mhHTTPReq
 )
 
+// Headers are packed as a tuple of tuples HTTP headers from Cocaine
 type Headers [][2]string
 
-type HTTPReq struct {
-	*http.Request
-}
+// type HTTPReq struct {
+// 	*http.Request
+// }
 
-// TBD: Extract more info
+// UnpackProxyRequest unpacks a HTTPRequest from a serialized cocaine form
 func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 	var v struct {
 		Method  string
-		Uri     string
+		URI     string
 		Version string
 		Headers Headers
 		Body    []byte
 	}
 
 	codec.NewDecoderBytes(raw, hHTTPReq).Decode(&v)
-	req, err := http.NewRequest(v.Method, v.Uri, bytes.NewBuffer(v.Body))
+	req, err := http.NewRequest(v.Method, v.URI, bytes.NewBuffer(v.Body))
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header = CocaineHeaderToHttpHeader(v.Headers)
+	req.Header = headersCocaineToHTTP(v.Headers)
 	req.Host = req.Header.Get("Host")
 
-	if xRealIp := req.Header.Get("X-Real-IP"); xRealIp != "" {
-		req.RemoteAddr = xRealIp
+	if xRealIP := req.Header.Get("X-Real-IP"); xRealIP != "" {
+		req.RemoteAddr = xRealIP
 	}
 
 	// If body is compressed it will be decompressed
@@ -58,11 +59,12 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 	return req, nil
 }
 
+// WriteHead converts the HTTP status code and the headers to the cocaine format
 func WriteHead(code int, headers Headers) interface{} {
 	return []interface{}{code, headers}
 }
 
-func HttpHeaderToCocaineHeader(header http.Header) Headers {
+func headersHTTPtoCocaine(header http.Header) Headers {
 	hdr := make(Headers, len(header))
 	for headerName, headerValues := range header {
 		for _, headerValue := range headerValues {
@@ -72,7 +74,7 @@ func HttpHeaderToCocaineHeader(header http.Header) Headers {
 	return hdr
 }
 
-func CocaineHeaderToHttpHeader(hdr Headers) http.Header {
+func headersCocaineToHTTP(hdr Headers) http.Header {
 	header := make(http.Header, len(hdr))
 	for _, hdrValues := range hdr {
 		header.Add(hdrValues[0], hdrValues[1])
@@ -109,7 +111,6 @@ func CocaineHeaderToHttpHeader(hdr Headers) http.Header {
 //			panic(err)
 //		}
 //	}
-
 func WrapHandler(handler http.Handler) EventHandler {
 	var wrapper = func(request Request, response Response) {
 		defer response.Close()
@@ -177,11 +178,11 @@ func WrapHandler(handler http.Handler) EventHandler {
 //		}
 //	}
 //
-
 func WrapHandlerFunc(hf http.HandlerFunc) EventHandler {
 	return WrapHandler(http.HandlerFunc(hf))
 }
 
+// WrapHandleFuncs wraps the bunch of http.Handlers to allow them handle requests via Worker
 func WrapHandleFuncs(hfs map[string]http.HandlerFunc) map[string]EventHandler {
 	handlers := make(map[string]EventHandler, len(hfs))
 	for key, hf := range hfs {

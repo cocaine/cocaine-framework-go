@@ -16,6 +16,7 @@ const (
 	defaultLoggerName = "logging"
 )
 
+// Logger represents an interface for a cocaine.Logger
 type Logger interface {
 	Err(message ...interface{})
 	Errf(format string, args ...interface{})
@@ -79,6 +80,8 @@ func (f *fallbackLogger) SetVerbosity(level int) {
 func (f *fallbackLogger) Close() {
 }
 
+// NewLogger tries to create a cocaine.Logger. It fallbacks to a simple implementation
+// if the cocaine.Logger is unavailable
 func NewLogger(args ...string) (Logger, error) {
 	return &fallbackLogger{}, nil
 }

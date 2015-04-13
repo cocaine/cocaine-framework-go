@@ -36,8 +36,8 @@ func TestASocketDrain(t *testing.T) {
 }
 
 func TestASocketConnect(t *testing.T) {
-	_, err := NewTCPConnection("128.0.0.1:45000", time.Second)
+	_, err := newTCPConnection("128.0.0.1:45000", time.Second)
 	assert.Error(t, err)
-	_, err = NewUnixConnection("unix.sock", time.Second)
+	_, err = newUnixConnection("unix.sock", time.Second)
 	assert.Error(t, err)
 }

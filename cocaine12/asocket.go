@@ -20,7 +20,7 @@ var (
 	hAsocket = &mhAsocket
 )
 
-type SocketIO interface {
+type socketIO interface {
 	Read() chan *Message
 	Write() chan *Message
 	IsClosed() <-chan struct{}
@@ -154,7 +154,7 @@ type asyncRWSocket struct {
 	closed        chan struct{} // broadcast channel
 }
 
-func NewAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
+func newAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
 	sock := &asyncRWSocket{
 		conn:          conn,
 		upstreamBuf:   newAsyncBuf(),
@@ -168,15 +168,15 @@ func NewAsyncRW(conn io.ReadWriteCloser) (*asyncRWSocket, error) {
 	return sock, nil
 }
 
-func NewUnixConnection(address string, timeout time.Duration) (SocketIO, error) {
+func newUnixConnection(address string, timeout time.Duration) (socketIO, error) {
 	return newAsyncConnection("unix", address, timeout)
 }
 
-func NewTCPConnection(address string, timeout time.Duration) (SocketIO, error) {
+func newTCPConnection(address string, timeout time.Duration) (socketIO, error) {
 	return newAsyncConnection("tcp", address, timeout)
 }
 
-func newAsyncConnection(family string, address string, timeout time.Duration) (SocketIO, error) {
+func newAsyncConnection(family string, address string, timeout time.Duration) (socketIO, error) {
 	dialer := net.Dialer{
 		Timeout:   timeout,
 		DualStack: true,
@@ -186,7 +186,7 @@ func newAsyncConnection(family string, address string, timeout time.Duration) (S
 	if err != nil {
 		return nil, err
 	}
-	return NewAsyncRW(conn)
+	return newAsyncRW(conn)
 }
 
 func (sock *asyncRWSocket) Close() {

@@ -12,41 +12,46 @@ const (
 	disownTimeout         = time.Second * 5
 	coreConnectionTimeout = time.Second * 5
 
-	// Error codes
-	// no handler for requested event
+	// ErrorNoEventHandler returns when there is no handler for a given event
 	ErrorNoEventHandler = 200
-	// panic in handler
+	// ErrorPanicInHandler returns when a handler is recovered from panic
 	ErrorPanicInHandler = 100
 )
 
 var (
-	ErrDisowned = errors.New("Disowned")
+	// ErrDisowned raises when the worker doesn't receive
+	// a heartbeat message during a heartbeat timeout
+	ErrDisowned = errors.New("disowned")
 )
 
-type RequestStream interface {
+type requestStream interface {
 	push(*Message)
 	Close()
 }
 
+// Request provides an interface for a handler to get data
 type Request interface {
 	Read(timeout ...time.Duration) ([]byte, error)
 }
 
+// ResponseStream provides an interface for a handler to reply
 type ResponseStream interface {
 	Write(data interface{})
 	ErrorMsg(code int, message string)
 	Close()
 }
 
+// Response provides an interface for a handler to reply
 type Response ResponseStream
 
+// EventHandler represents a type of handler
 type EventHandler func(Request, Response)
 
-// Performs IO operations between an application
+// Worker performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
 type Worker struct {
 	// Connection to cocaine-runtime
-	conn SocketIO
+	conn socketIO
 	// Id to introduce myself to cocaine-runtime
 	id string
 	// Each tick we shoud send a heartbeat as keep-alive
@@ -54,7 +59,7 @@ type Worker struct {
 	// Timeout to receive a heartbeat reply
 	disownTimer *time.Timer
 	// Map handlers to sessions
-	sessions map[uint64]RequestStream
+	sessions map[uint64]requestStream
 	// Channel for replying from handlers
 	// Everything is piped to cocaine without changes
 	// ResponseStream is responsible to format proper message
@@ -65,7 +70,7 @@ type Worker struct {
 	stopped chan struct{}
 }
 
-// Creates new Worker
+// NewWorker connects to the cocaine-runtime and create Worker on top of this connection
 func NewWorker() (*Worker, error) {
 	setupFlags()
 	flag.Parse()
@@ -73,14 +78,14 @@ func NewWorker() (*Worker, error) {
 	workerID := flagUUID
 
 	// Connect to cocaine-runtime over a unix socket
-	sock, err := NewUnixConnection(flagEndpoint, coreConnectionTimeout)
+	sock, err := newUnixConnection(flagEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
 	return newWorker(sock, workerID)
 }
 
-func newWorker(conn SocketIO, id string) (*Worker, error) {
+func newWorker(conn socketIO, id string) (*Worker, error) {
 	w := &Worker{
 		conn: conn,
 		id:   id,
@@ -88,7 +93,7 @@ func newWorker(conn SocketIO, id string) (*Worker, error) {
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
 
-		sessions:     make(map[uint64]RequestStream),
+		sessions:     make(map[uint64]requestStream),
 		fromHandlers: make(chan *Message),
 		handlers:     make(map[string]EventHandler),
 
@@ -110,12 +115,13 @@ func newWorker(conn SocketIO, id string) (*Worker, error) {
 	return w, nil
 }
 
-// Bind handler for event
+// On binds the handler for a given event
 func (w *Worker) On(event string, handler EventHandler) {
 	w.handlers[event] = handler
 }
 
-// Run serving loop
+// Run makes the worker anounce itself to a cocaine-runtime
+// as being ready to hadnle incoming requests and hablde them
 func (w *Worker) Run(handlers map[string]EventHandler) error {
 	for event, handler := range handlers {
 		w.On(event, handler)
@@ -124,6 +130,7 @@ func (w *Worker) Run(handlers map[string]EventHandler) error {
 	return w.loop()
 }
 
+// Stop makes the Worker stop handling requests
 func (w *Worker) Stop() {
 	if w.isStopped() {
 		return
@@ -182,18 +189,18 @@ func (w *Worker) loop() error {
 
 func (w *Worker) onMessage(msg *Message) {
 	switch msg.MsgType {
-	case ChunkType:
+	case chunkType:
 		if reqStream, ok := w.sessions[msg.Session]; ok {
 			reqStream.push(msg)
 		}
 
-	case ChokeType:
+	case chokeType:
 		if reqStream, ok := w.sessions[msg.Session]; ok {
 			reqStream.Close()
 			delete(w.sessions, msg.Session)
 		}
 
-	case InvokeType:
+	case invokeType:
 		var (
 			event          string
 			currentSession = msg.Session
@@ -228,13 +235,13 @@ func (w *Worker) onMessage(msg *Message) {
 			handler(requestStream, responseStream)
 		}()
 
-	case HeartbeatType:
+	case heartbeatType:
 		// Reply to heartbeat has been received,
 		// so we are not disowned & disownTimer must be stopped
 		// It will be launched when a next heartbeat is sent
 		w.disownTimer.Stop()
 
-	case TerminateType:
+	case terminateType:
 		// According to spec we have time
 		// to prepare for being killed by cocaine-runtime
 		w.onTerminate()
@@ -260,14 +267,14 @@ func (w *Worker) onTerminate() {
 // to notify runtime that we have started
 func (w *Worker) sendHandshake() {
 	select {
-	case w.conn.Write() <- NewHandshake(w.id):
+	case w.conn.Write() <- newHandshake(w.id):
 	case <-w.conn.IsClosed():
 	}
 }
 
 func (w *Worker) onHeartbeat() {
 	select {
-	case w.conn.Write() <- NewHeartbeatMessage():
+	case w.conn.Write() <- newHeartbeatMessage():
 	case <-w.conn.IsClosed():
 	}
 

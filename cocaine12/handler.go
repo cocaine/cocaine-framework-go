@@ -12,10 +12,12 @@ type request struct {
 }
 
 var (
+	// ErrStreamIsClosed means that a response stream is closed
 	ErrStreamIsClosed = &ClosedError{}
-	ErrTimeout        = &TimeoutError{}
-
-	ErrBadPayload = errors.New("Payload is not []byte")
+	// ErrTimeout means that a request is timeouted
+	ErrTimeout = &TimeoutError{}
+	// ErrBadPayload means that a message payload is malformed
+	ErrBadPayload = errors.New("payload is not []byte")
 )
 
 type TimeoutError struct{}
@@ -69,9 +71,8 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 
 		if result, isByte := msg.Payload[0].([]byte); isByte {
 			return result, nil
-		} else {
-			return nil, ErrBadPayload
 		}
+		return nil, ErrBadPayload
 	case <-onTimeout:
 		return nil, ErrTimeout
 	}
@@ -118,7 +119,7 @@ func (r *response) Write(data interface{}) {
 		return
 	}
 
-	r.fromHandler <- NewChunk(r.session, data)
+	r.fromHandler <- newChunk(r.session, data)
 }
 
 // Notify a client about finishing the datastream.
@@ -127,7 +128,7 @@ func (r *response) Close() {
 		return
 	}
 
-	r.fromHandler <- NewChoke(r.session)
+	r.fromHandler <- newChoke(r.session)
 	close(r.closed)
 }
 
@@ -137,7 +138,7 @@ func (r *response) ErrorMsg(code int, message string) {
 		return
 	}
 
-	r.fromHandler <- NewError(
+	r.fromHandler <- newError(
 		// current session number
 		r.session,
 		// error code
@@ -161,7 +162,7 @@ func (r *response) isClosed() bool {
 func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
 	var (
 		pending []*Message
-		closed  <-chan struct{} = onclose
+		closed  = onclose
 	)
 
 	for {

@@ -10,13 +10,13 @@ var (
 )
 
 const (
-	HandshakeType = iota
-	HeartbeatType
-	TerminateType
-	InvokeType
-	ChunkType
-	ErrorType
-	ChokeType
+	handshakeType = iota
+	heartbeatType
+	terminateType
+	invokeType
+	chunkType
+	errorType
+	chokeType
 )
 
 func getEventName(msg *Message) (string, bool) {
@@ -32,64 +32,64 @@ func getEventName(msg *Message) (string, bool) {
 // ToDo: find out if sync.Pool may give
 // profit to create messages
 
-func NewHandshake(id string) *Message {
+func newHandshake(id string) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: 0,
-			MsgType: HandshakeType,
+			MsgType: handshakeType,
 		},
 		Payload: []interface{}{id},
 	}
 }
 
-func NewHeartbeatMessage() *Message {
+func newHeartbeatMessage() *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: 0,
-			MsgType: HeartbeatType,
+			MsgType: heartbeatType,
 		},
 		Payload: []interface{}{},
 	}
 }
 
-func NewInvoke(session uint64, event string) *Message {
+func newInvoke(session uint64, event string) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
-			MsgType: InvokeType,
+			MsgType: invokeType,
 		},
 		Payload: []interface{}{event},
 	}
 }
 
-func NewChunk(session uint64, data interface{}) *Message {
+func newChunk(session uint64, data interface{}) *Message {
 	var res []byte
 	codec.NewEncoderBytes(&res, h).Encode(data)
 
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
-			MsgType: ChunkType,
+			MsgType: chunkType,
 		},
 		Payload: []interface{}{res},
 	}
 }
 
-func NewError(session uint64, code int, message string) *Message {
+func newError(session uint64, code int, message string) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
-			MsgType: ErrorType,
+			MsgType: errorType,
 		},
 		Payload: []interface{}{code, message},
 	}
 }
 
-func NewChoke(session uint64) *Message {
+func newChoke(session uint64) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
-			MsgType: ChokeType,
+			MsgType: chokeType,
 		},
 		Payload: []interface{}{},
 	}
