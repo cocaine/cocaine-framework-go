@@ -167,8 +167,8 @@ func NewService(name string, args ...string) (s *Service, err error) {
 	}
 
 	s = &Service{
-		ServiceInfo:    info,
 		socketIO:       sock,
+		ServiceInfo:    info,
 		sessions:       newSessions(),
 		stop:           make(chan struct{}),
 		args:           args,
@@ -194,9 +194,11 @@ func (service *Service) Reconnect(force bool) error {
 	if !service.isReconnecting {
 		service.mutex.Lock()
 		defer service.mutex.Unlock()
+
 		if service.isReconnecting {
 			return fmt.Errorf("%s", "Service is reconnecting now")
 		}
+
 		service.isReconnecting = true
 		defer func() { service.isReconnecting = false }()
 
@@ -293,33 +295,42 @@ func (service *Service) Close() {
 	service.socketIO.Close()
 }
 
-func (service *Service) getServiceChanPair() (In chan ServiceResult, Out chan ServiceResult) {
-	In = make(chan ServiceResult)
-	Out = make(chan ServiceResult)
+func (service *Service) getServiceChanPair() (input chan ServiceResult, output chan ServiceResult) {
+	input, output = make(chan ServiceResult), make(chan ServiceResult)
+
+	service.wg.Add(1)
 	go func() {
-		service.wg.Add(1)
 		defer service.wg.Done()
-		finished := false
-		var pending []ServiceResult
+
+		// Notify a receiver
+		defer close(output)
+
+		var (
+			finished = false
+			pending  []ServiceResult
+		)
+
 		for {
-			var out chan ServiceResult
-			var first ServiceResult
+			var (
+				out   chan ServiceResult
+				in    = input
+				first ServiceResult
+			)
 
 			if len(pending) > 0 {
 				first = pending[0]
-				out = Out
+				out = output
 			} else if finished {
-				close(Out)
 				break
 			}
 
 			select {
-			case incoming, ok := <-In:
+			case incoming, ok := <-in:
 				if ok {
 					pending = append(pending, incoming)
 				} else {
 					finished = true
-					In = nil
+					in = nil
 				}
 
 			case out <- first:
