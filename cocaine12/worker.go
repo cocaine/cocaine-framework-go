@@ -47,6 +47,24 @@ type Response ResponseStream
 // EventHandler represents a type of handler
 type EventHandler func(Request, Response)
 
+// FallbackEventHandler handles an event if there is no other handler
+// for the given event
+type FallbackEventHandler func(string, Request, Response)
+
+// DefaultFallbackEventHandler sends an error message if a client requests
+// unhandled event
+func DefaultFallbackEventHandler(event string, request Request, response Response) {
+	errMsg := fmt.Sprintf("There is no handler for event %s", event)
+	response.ErrorMsg(ErrorNoEventHandler, errMsg)
+}
+
+func recoverTrap(event string, response Response) {
+	if recoverInfo := recover(); recoverInfo != nil {
+		errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", event, recoverInfo)
+		response.ErrorMsg(ErrorPanicInHandler, errMsg)
+	}
+}
+
 // Worker performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
 type Worker struct {
@@ -68,6 +86,8 @@ type Worker struct {
 	handlers map[string]EventHandler
 	// Notify Run about stop
 	stopped chan struct{}
+	// FallbackEventHandler handles an event if there is no other handler
+	fallbackHandler FallbackEventHandler
 }
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
@@ -98,6 +118,8 @@ func newWorker(conn socketIO, id string) (*Worker, error) {
 		handlers:     make(map[string]EventHandler),
 
 		stopped: make(chan struct{}),
+
+		fallbackHandler: DefaultFallbackEventHandler,
 	}
 
 	// NewTimer launches timer
@@ -118,6 +140,17 @@ func newWorker(conn socketIO, id string) (*Worker, error) {
 // On binds the handler for a given event
 func (w *Worker) On(event string, handler EventHandler) {
 	w.handlers[event] = handler
+}
+
+// SetFallbackHandler sets the handler to be a fallback handler
+func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
+	w.fallbackHandler = handler
+}
+
+// call a fallback handler inwith a panic trap
+func (w *Worker) callFallbackHandler(event string, request Request, response Response) {
+	defer recoverTrap(event, response)
+	w.fallbackHandler(event, request, response)
 }
 
 // Run makes the worker anounce itself to a cocaine-runtime
@@ -213,24 +246,17 @@ func (w *Worker) onMessage(msg *Message) {
 		}
 
 		responseStream := newResponse(currentSession, w.fromHandlers)
-
-		handler, ok := w.handlers[event]
-		if !ok {
-			errMsg := fmt.Sprintf("There is no handler for event %s", event)
-			responseStream.ErrorMsg(ErrorNoEventHandler, errMsg)
-			return
-		}
-
 		requestStream := newRequest()
 		w.sessions[currentSession] = requestStream
 
+		handler, ok := w.handlers[event]
+		if !ok {
+			go w.callFallbackHandler(event, requestStream, responseStream)
+			return
+		}
+
 		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", event, r)
-					responseStream.ErrorMsg(ErrorPanicInHandler, errMsg)
-				}
-			}()
+			defer recoverTrap(event, responseStream)
 
 			handler(requestStream, responseStream)
 		}()
