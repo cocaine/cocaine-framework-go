@@ -1,14 +1,8 @@
-// +build ignore
+package cocaine12
 
-package cocaine
+// ToDo: this file should be generated from c++
 
-type ServiceInfo struct {
-	Endpoints []EndpointItem
-	Version   uint64
-	API       DispatchMap
-}
-
-func NewLocatorServiceInfo() *ServiceInfo {
+func newLocatorServiceInfo() *ServiceInfo {
 	return &ServiceInfo{
 		Endpoints: nil,
 		Version:   1,

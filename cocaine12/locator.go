@@ -1,6 +1,4 @@
-// +build ignore
-
-package cocaine
+package cocaine12
 
 import (
 	"time"
@@ -16,7 +14,6 @@ type Locator struct {
 }
 
 func NewLocator(args ...string) (*Locator, error) {
-	DEBUGTEST("creating locator: %v", args)
 	endpoint := DefaultLocator
 
 	if len(args) == 1 {
@@ -25,18 +22,17 @@ func NewLocator(args ...string) (*Locator, error) {
 
 	sock, err := newAsyncConnection("tcp", endpoint, time.Second*5)
 	if err != nil {
-		DEBUGTEST("unable to create async connection: %s", err)
 		return nil, err
 	}
 
 	service := Service{
-		ServiceInfo:     NewLocatorServiceInfo(),
-		socketIO:        sock,
-		sessions:        newKeeperStruct(),
-		stop:            make(chan struct{}),
-		args:            args,
-		name:            "locator",
-		is_reconnecting: false,
+		ServiceInfo:    newLocatorServiceInfo(),
+		socketIO:       sock,
+		sessions:       newSessions(),
+		stop:           make(chan struct{}),
+		args:           args,
+		name:           "locator",
+		isReconnecting: false,
 	}
 	go service.loop()
 
@@ -52,20 +48,30 @@ func (l *Locator) Resolve(name string) (<-chan ResolveChannelResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	DEBUGTEST("After Call in Resolve: %v, %v", channel, err)
 
 	go func() {
-		var serviceInfo ServiceInfo
 		answer, err := channel.Get()
 		if err != nil {
-			DEBUGTEST("After channel.Get: %v, %v", answer, err)
+			Out <- ResolveChannelResult{
+				ServiceInfo: nil,
+				Err:         err,
+			}
+			return
 		}
 
-		answer.Extract(&serviceInfo)
+		var serviceInfo ServiceInfo
+		if err := answer.Extract(&serviceInfo); err != nil {
+			Out <- ResolveChannelResult{
+				ServiceInfo: nil,
+				Err:         err,
+			}
+		}
+
 		Out <- ResolveChannelResult{
 			ServiceInfo: &serviceInfo,
 			Err:         nil,
 		}
+
 	}()
 
 	return Out, nil

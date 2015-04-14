@@ -1,12 +1,16 @@
-// +build ignore
-
-package cocaine
+package cocaine12
 
 import (
 	"fmt"
 	"sync"
 	"time"
 )
+
+type ServiceInfo struct {
+	Endpoints []EndpointItem
+	Version   uint64
+	API       DispatchMap
+}
 
 type Channel interface {
 	Rx
@@ -33,8 +37,6 @@ type rx struct {
 }
 
 func (rx *rx) Get(timeout ...time.Duration) (ServiceResult, error) {
-	DEBUGTEST("RX.Get has been called from %v", rx.pollBuffer)
-
 	var chanTimeout <-chan time.Time
 	if len(timeout) == 1 {
 		chanTimeout = time.After(timeout[0])
@@ -42,18 +44,14 @@ func (rx *rx) Get(timeout ...time.Duration) (ServiceResult, error) {
 
 	select {
 	case res := <-rx.pollBuffer:
-		DEBUGTEST("RX: case <-rx.buffer: %v", &rx)
 		return res, nil
 	case <-chanTimeout:
-		DEBUGTEST("RX: case <-rx.buffer:")
 		return nil, fmt.Errorf("Timeout error")
 	}
 }
 
 func (rx *rx) Push(res ServiceResult) {
-	DEBUGTEST("RX PUSH %v", rx.pushBuffer)
 	rx.pushBuffer <- res
-	DEBUGTEST("RX PUSHED INTO %v", rx.pushBuffer)
 }
 
 type tx struct {
@@ -84,7 +82,7 @@ func (s *serviceRes) Extract(target interface{}) (err error) {
 }
 
 // ToDo: Extract method for an array semantic
-// Extreact(target ...interface{})
+// Extract(target ...interface{})
 
 func (s *serviceRes) Result() (uint64, []interface{}, error) {
 	return s.method, s.payload, s.err
@@ -111,15 +109,19 @@ func (err *ServiceError) Error() string {
 
 // Allows you to invoke methods of services and send events to other cloud applications.
 type Service struct {
+	// Tracking a connection state
 	mutex sync.Mutex
 	wg    sync.WaitGroup
+
 	socketIO
 	*ServiceInfo
-	sessions        *keeperStruct
-	stop            chan struct{}
-	args            []string
-	name            string
-	is_reconnecting bool
+
+	sessions *sessions
+	stop     chan struct{}
+
+	args           []string
+	name           string
+	isReconnecting bool
 }
 
 //Creates new service instance with specifed name.
@@ -165,22 +167,20 @@ func NewService(name string, args ...string) (s *Service, err error) {
 	}
 
 	s = &Service{
-		ServiceInfo:     info,
-		socketIO:        sock,
-		sessions:        newKeeperStruct(),
-		stop:            make(chan struct{}),
-		args:            args,
-		name:            name,
-		is_reconnecting: false,
+		ServiceInfo:    info,
+		socketIO:       sock,
+		sessions:       newSessions(),
+		stop:           make(chan struct{}),
+		args:           args,
+		name:           name,
+		isReconnecting: false,
 	}
 	go s.loop()
 	return
 }
 
 func (service *Service) loop() {
-	DEBUGTEST("Service loop has started")
 	for data := range service.socketIO.Read() {
-		DEBUGTEST("Service.loop: %v", &data)
 		if rx, ok := service.sessions.Get(data.Session); ok {
 			rx.Push(&serviceRes{
 				payload: data.Payload,
@@ -191,14 +191,14 @@ func (service *Service) loop() {
 }
 
 func (service *Service) Reconnect(force bool) error {
-	if !service.is_reconnecting {
+	if !service.isReconnecting {
 		service.mutex.Lock()
 		defer service.mutex.Unlock()
-		if service.is_reconnecting {
+		if service.isReconnecting {
 			return fmt.Errorf("%s", "Service is reconnecting now")
 		}
-		service.is_reconnecting = true
-		defer func() { service.is_reconnecting = false }()
+		service.isReconnecting = true
+		defer func() { service.isReconnecting = false }()
 
 		if !force {
 			select {
@@ -276,7 +276,6 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 
 //Calls a remote method by name and pass args
 func (service *Service) Call(name string, args ...interface{}) (Channel, error) {
-	DEBUGTEST("Service.Call: %s, %v", name, args)
 	select {
 	case <-service.IsClosed():
 		if err := service.Reconnect(false); err != nil {
