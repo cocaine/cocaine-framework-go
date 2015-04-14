@@ -145,14 +145,17 @@ func (sock *asyncRWSocket) readloop() {
 		buf := make([]byte, 65536)
 		for {
 			count, err := sock.Conn.Read(buf)
+			if count > 0 {
+				bufferToSend := make([]byte, count)
+				copy(bufferToSend[:], buf[:count])
+				sock.socketToClient.in <- bufferToSend
+			}
+
 			if err != nil {
 				close(sock.socketToClient.in)
 				sock.close()
 				return
 			}
-			bufferToSend := make([]byte, count)
-			copy(bufferToSend[:], buf[:count])
-			sock.socketToClient.in <- bufferToSend
 		}
 	}()
 }
