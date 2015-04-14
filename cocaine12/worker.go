@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"runtime/debug"
 	"time"
 )
 
@@ -54,14 +55,22 @@ type FallbackEventHandler func(string, Request, Response)
 // DefaultFallbackEventHandler sends an error message if a client requests
 // unhandled event
 func DefaultFallbackEventHandler(event string, request Request, response Response) {
-	errMsg := fmt.Sprintf("There is no handler for event %s", event)
+	errMsg := fmt.Sprintf("There is no handler for an event %s", event)
 	response.ErrorMsg(ErrorNoEventHandler, errMsg)
 }
 
-func recoverTrap(event string, response Response) {
+func recoverTrap(event string, response Response, printStack bool) {
 	if recoverInfo := recover(); recoverInfo != nil {
-		errMsg := fmt.Sprintf("Error in event: '%s', exception: %s", event, recoverInfo)
-		response.ErrorMsg(ErrorPanicInHandler, errMsg)
+		var stack []byte
+
+		if printStack {
+			stack = debug.Stack()
+		}
+
+		response.ErrorMsg(
+			ErrorPanicInHandler,
+			fmt.Sprintf("Event: '%s', recover: %s, stack: %s", event, recoverInfo, stack),
+		)
 	}
 }
 
@@ -88,6 +97,8 @@ type Worker struct {
 	stopped chan struct{}
 	// FallbackEventHandler handles an event if there is no other handler
 	fallbackHandler FallbackEventHandler
+	// if set recoverTrap sends Stack
+	debug bool
 }
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
@@ -120,6 +131,7 @@ func newWorker(conn socketIO, id string) (*Worker, error) {
 		stopped: make(chan struct{}),
 
 		fallbackHandler: DefaultFallbackEventHandler,
+		debug:           false,
 	}
 
 	// NewTimer launches timer
@@ -149,8 +161,14 @@ func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
 
 // call a fallback handler inwith a panic trap
 func (w *Worker) callFallbackHandler(event string, request Request, response Response) {
-	defer recoverTrap(event, response)
+	defer recoverTrap(event, response, w.debug)
 	w.fallbackHandler(event, request, response)
+}
+
+// SetDebug enables debug mode of the Worker.
+// It allows to print Stack of a paniced handler
+func (w *Worker) SetDebug(debug bool) {
+	w.debug = debug
 }
 
 // Run makes the worker anounce itself to a cocaine-runtime
@@ -256,7 +274,7 @@ func (w *Worker) onMessage(msg *Message) {
 		}
 
 		go func() {
-			defer recoverTrap(event, responseStream)
+			defer recoverTrap(event, responseStream, w.debug)
 
 			handler(requestStream, responseStream)
 		}()
