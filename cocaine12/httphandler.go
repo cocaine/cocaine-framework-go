@@ -64,7 +64,7 @@ func WriteHead(code int, headers Headers) interface{} {
 	return []interface{}{code, headers}
 }
 
-func headersHTTPtoCocaine(header http.Header) Headers {
+func HeadersHTTPtoCocaine(header http.Header) Headers {
 	hdr := make(Headers, len(header))
 	for headerName, headerValues := range header {
 		for _, headerValue := range headerValues {

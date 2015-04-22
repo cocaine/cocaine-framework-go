@@ -43,7 +43,7 @@ func (w *ResponseWriter) WriteHeader(code int) {
 	}
 
 	w.cRes.Write(
-		WriteHead(code, headersHTTPtoCocaine(w.handlerHeader)),
+		WriteHead(code, HeadersHTTPtoCocaine(w.handlerHeader)),
 	)
 }
 
