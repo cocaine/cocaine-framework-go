@@ -134,6 +134,13 @@ func (sock *asyncRWSocket) writeloop() {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
 				sock.close()
+				// blackhole all writes
+				go func() {
+					ok := true
+					for ok {
+						_, ok = <-sock.clientToSock.out
+					}
+				}()
 				return
 			}
 		}
