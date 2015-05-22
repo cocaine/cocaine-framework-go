@@ -131,7 +131,6 @@ func (b *Bridge) Start() error {
 	onClose := make(chan struct{})
 	defer close(onClose)
 	go func() {
-		//ToDo: make this configurable
 		deadline := time.After(5 * time.Second)
 		endpoint := b.config.Endpoint()
 	PING_LOOP:
@@ -147,7 +146,6 @@ func (b *Bridge) Start() error {
 				return
 			default:
 			}
-
 		}
 		b.worker.Run(nil)
 	}()
@@ -172,7 +170,6 @@ func (b *Bridge) Start() error {
 		if err := buf.Err(); err != nil {
 			b.logger.Errf("unable to read stdout %v", err)
 		}
-
 	}()
 
 	go func() {
@@ -184,7 +181,6 @@ func (b *Bridge) Start() error {
 		if err := buf.Err(); err != nil {
 			b.logger.Errf("unable to read stderr: %v", err)
 		}
-
 	}()
 
 	if err := b.child.Start(); err != nil {
