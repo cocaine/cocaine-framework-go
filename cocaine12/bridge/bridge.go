@@ -1,6 +1,8 @@
 package bridge
 
 import (
+	"bufio"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -17,6 +19,7 @@ type Bridge struct {
 	onClose chan struct{}
 
 	worker *cocaine.Worker
+	logger cocaine.Logger
 	child  *exec.Cmd
 }
 
@@ -27,14 +30,18 @@ type BridgeConfig struct {
 	Port int
 }
 
+func (cfg *BridgeConfig) Endpoint() string {
+	return fmt.Sprintf("localhost:%d", cfg.Port)
+}
+
 func DefaultBridgeConfig() *BridgeConfig {
-	name := os.Getenv("NAME")
+	name := "slave"
 
 	cfg := &BridgeConfig{
 		Name: name,
 		Args: os.Args[1:],
 		Env:  os.Environ(),
-		Port: 80,
+		Port: 8080,
 	}
 	return cfg
 }
@@ -49,13 +56,14 @@ func (r *responseWriter) Write(body []byte) (int, error) {
 	return len(body), nil
 }
 
-func NewBridge(cfg *BridgeConfig) (*Bridge, error) {
+func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
+	var worker *cocaine.Worker
 	worker, err := cocaine.NewWorker()
 	if err != nil {
 		return nil, err
 	}
 
-	cli := http.Client{}
+	endpoint := cfg.Endpoint()
 
 	worker.SetFallbackHandler(func(event string, request cocaine.Request, response cocaine.Response) {
 		defer response.Close()
@@ -79,14 +87,18 @@ func NewBridge(cfg *BridgeConfig) (*Bridge, error) {
 		httpRequest, err := cocaine.UnpackProxyRequest(msg)
 		if err != nil {
 			response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
-			response.Write("malformed request")
+			response.Write(fmt.Sprintf("malformed request: %v", err))
 			return
 		}
 
-		appResp, err := cli.Do(httpRequest)
+		// Set scheme and endpoint
+		httpRequest.URL.Scheme = "http"
+		httpRequest.URL.Host = endpoint
+
+		appResp, err := http.DefaultClient.Do(httpRequest)
 		if err != nil {
 			response.Write(cocaine.WriteHead(http.StatusInternalServerError, cocaine.Headers{}))
-			response.Write("unable to proxy a request")
+			response.Write(fmt.Sprintf("unable to proxy a request: %v", err))
 			return
 		}
 		defer appResp.Body.Close()
@@ -105,6 +117,7 @@ func NewBridge(cfg *BridgeConfig) (*Bridge, error) {
 	b := &Bridge{
 		config:  cfg,
 		worker:  worker,
+		logger:  logger,
 		child:   child,
 		onClose: make(chan struct{}),
 	}
@@ -114,8 +127,71 @@ func NewBridge(cfg *BridgeConfig) (*Bridge, error) {
 	return b, nil
 }
 
-func (b *Bridge) Start() {
-	go b.worker.Run(nil)
+func (b *Bridge) Start() error {
+	onClose := make(chan struct{})
+	defer close(onClose)
+	go func() {
+		//ToDo: make this configurable
+		deadline := time.After(5 * time.Second)
+		endpoint := b.config.Endpoint()
+	PING_LOOP:
+		for {
+			if err := ping(endpoint, time.Millisecond*100); err == nil {
+				break PING_LOOP
+			}
+
+			select {
+			case <-deadline:
+				return
+			case <-onClose:
+				return
+			default:
+			}
+
+		}
+		b.worker.Run(nil)
+	}()
+
+	stdout, err := b.child.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	stderr, err := b.child.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	// ToDo: make this goroutines terminatable
+	go func() {
+		buf := bufio.NewScanner(stdout)
+		for buf.Scan() {
+			b.logger.Infof("%s", buf.Bytes())
+		}
+
+		if err := buf.Err(); err != nil {
+			b.logger.Errf("unable to read stdout %v", err)
+		}
+
+	}()
+
+	go func() {
+		buf := bufio.NewScanner(stderr)
+		for buf.Scan() {
+			b.logger.Infof("%s", buf.Bytes())
+		}
+
+		if err := buf.Err(); err != nil {
+			b.logger.Errf("unable to read stderr: %v", err)
+		}
+
+	}()
+
+	if err := b.child.Start(); err != nil {
+		return err
+	}
+
+	return b.child.Wait()
 }
 
 func (b *Bridge) eventLoop() {
@@ -128,14 +204,16 @@ func (b *Bridge) eventLoop() {
 
 	var stopChild = true
 
-	select {
-	case <-signalCHLDWatcher:
-		// we should stop the worker only
-		stopChild = false
-	case <-signalWatcher:
-		// pass stopChild
-	case <-b.onClose:
-		// pass to stopChild
+	for {
+		select {
+		case <-signalCHLDWatcher:
+			// we should stop the worker only
+			stopChild = false
+		case <-signalWatcher:
+			// pass stopChild
+		case <-b.onClose:
+			// pass to stopChild
+		}
 	}
 
 	b.stopWorker()
