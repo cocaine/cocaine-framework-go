@@ -6,16 +6,23 @@ type Fields map[string]interface{}
 
 type EntryLogger interface {
 	Errf(format string, args ...interface{})
+	Err(format string)
+
 	Warnf(format string, args ...interface{})
+	Warn(format string)
+
 	Infof(format string, args ...interface{})
+	Info(format string)
+
 	Debugf(format string, args ...interface{})
+	Debug(format string)
 }
 
 // Logger represents an interface for a cocaine.Logger
 type Logger interface {
 	EntryLogger
 
-	Log(level Severity, msg string, args []interface{}, fields Fields)
+	log(level Severity, fields Fields, msg string, args ...interface{})
 	WithFields(Fields) *Entry
 
 	Verbosity() Severity

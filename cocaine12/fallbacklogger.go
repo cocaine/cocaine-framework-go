@@ -13,7 +13,7 @@ type fallbackLogger struct {
 func (f *fallbackLogger) WithFields(fields Fields) *Entry {
 	return &Entry{
 		Logger: f,
-		fields: fields,
+		Fields: fields,
 	}
 }
 
@@ -40,7 +40,7 @@ func (f *fallbackLogger) V(level Severity) bool {
 	return level >= f.severity.get()
 }
 
-func (f *fallbackLogger) Log(level Severity, msg string, args []interface{}, fields Fields) {
+func (f *fallbackLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
 	if !f.V(level) {
 		return
 	}
@@ -53,19 +53,35 @@ func (f *fallbackLogger) Log(level Severity, msg string, args []interface{}, fie
 }
 
 func (f *fallbackLogger) Errf(format string, args ...interface{}) {
-	f.Log(ErrorLevel, format, args, defaultFields)
+	f.log(ErrorLevel, defaultFields, format, args...)
+}
+
+func (f *fallbackLogger) Err(format string) {
+	f.log(ErrorLevel, defaultFields, format)
 }
 
 func (f *fallbackLogger) Warnf(format string, args ...interface{}) {
-	f.Log(WarnLevel, format, args, defaultFields)
+	f.log(WarnLevel, defaultFields, format, args...)
+}
+
+func (f *fallbackLogger) Warn(format string) {
+	f.log(WarnLevel, defaultFields, format)
 }
 
 func (f *fallbackLogger) Infof(format string, args ...interface{}) {
-	f.Log(InfoLevel, format, args, defaultFields)
+	f.log(InfoLevel, defaultFields, format, args...)
+}
+
+func (f *fallbackLogger) Info(format string) {
+	f.log(InfoLevel, defaultFields, format)
 }
 
 func (f *fallbackLogger) Debugf(format string, args ...interface{}) {
-	f.Log(DebugLevel, format, args, defaultFields)
+	f.log(DebugLevel, defaultFields, format, args...)
+}
+
+func (f *fallbackLogger) Debug(format string) {
+	f.log(DebugLevel, defaultFields, format)
 }
 
 func (f *fallbackLogger) Verbosity() Severity {
