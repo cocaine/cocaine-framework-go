@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"runtime/debug"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 const (
@@ -46,20 +48,20 @@ type ResponseStream interface {
 type Response ResponseStream
 
 // EventHandler represents a type of handler
-type EventHandler func(Request, Response)
+type EventHandler func(context.Context, Request, Response)
 
 // FallbackEventHandler handles an event if there is no other handler
 // for the given event
-type FallbackEventHandler func(string, Request, Response)
+type FallbackEventHandler func(context.Context, string, Request, Response)
 
 // DefaultFallbackEventHandler sends an error message if a client requests
 // unhandled event
-func DefaultFallbackEventHandler(event string, request Request, response Response) {
+func DefaultFallbackEventHandler(ctx context.Context, event string, request Request, response Response) {
 	errMsg := fmt.Sprintf("There is no handler for an event %s", event)
 	response.ErrorMsg(ErrorNoEventHandler, errMsg)
 }
 
-func recoverTrap(event string, response Response, printStack bool) {
+func recoverTrap(ctx context.Context, event string, response Response, printStack bool) {
 	if recoverInfo := recover(); recoverInfo != nil {
 		var stack []byte
 
@@ -160,9 +162,9 @@ func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
 }
 
 // call a fallback handler inwith a panic trap
-func (w *Worker) callFallbackHandler(event string, request Request, response Response) {
-	defer recoverTrap(event, response, w.debug)
-	w.fallbackHandler(event, request, response)
+func (w *Worker) callFallbackHandler(ctx context.Context, event string, request Request, response Response) {
+	defer recoverTrap(ctx, event, response, w.debug)
+	w.fallbackHandler(ctx, event, request, response)
 }
 
 // SetDebug enables debug mode of the Worker.
@@ -263,20 +265,21 @@ func (w *Worker) onMessage(msg *Message) {
 			return
 		}
 
+		ctx := context.Background()
 		responseStream := newResponse(currentSession, w.fromHandlers)
 		requestStream := newRequest()
 		w.sessions[currentSession] = requestStream
 
 		handler, ok := w.handlers[event]
 		if !ok {
-			go w.callFallbackHandler(event, requestStream, responseStream)
+			go w.callFallbackHandler(ctx, event, requestStream, responseStream)
 			return
 		}
 
 		go func() {
-			defer recoverTrap(event, responseStream, w.debug)
+			defer recoverTrap(ctx, event, responseStream, w.debug)
 
-			handler(requestStream, responseStream)
+			handler(ctx, requestStream, responseStream)
 		}()
 
 	case heartbeatType:

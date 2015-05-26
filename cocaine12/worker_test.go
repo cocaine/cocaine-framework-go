@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type pipeConn struct {
@@ -57,19 +59,19 @@ func TestWorker(t *testing.T) {
 	}
 
 	handlers := map[string]EventHandler{
-		"test": func(req Request, res Response) {
+		"test": func(ctx context.Context, req Request, res Response) {
 			data, _ := req.Read()
 			res.Write(data)
 			res.Close()
 		},
-		"error": func(req Request, res Response) {
+		"error": func(ctx context.Context, req Request, res Response) {
 			_, _ = req.Read()
 			res.ErrorMsg(-100, "dummyError")
 		},
 		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "OK")
 		}),
-		"panic": func(req Request, res Response) {
+		"panic": func(ctx context.Context, req Request, res Response) {
 			panic("PANIC")
 		},
 	}

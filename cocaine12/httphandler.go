@@ -3,10 +3,10 @@ package cocaine12
 import (
 	"bytes"
 	"compress/gzip"
-	// "errors"
-	// "fmt"
 	"io"
 	"net/http"
+
+	"golang.org/x/net/context"
 
 	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
 )
@@ -112,7 +112,7 @@ func headersCocaineToHTTP(hdr Headers) http.Header {
 //		}
 //	}
 func WrapHandler(handler http.Handler) EventHandler {
-	var wrapper = func(request Request, response Response) {
+	var wrapper = func(ctx context.Context, request Request, response Response) {
 		defer response.Close()
 
 		// Read the first chunk
