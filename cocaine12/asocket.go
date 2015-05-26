@@ -226,6 +226,12 @@ func (sock *asyncRWSocket) writeloop() {
 			err := encoder.Encode(incoming)
 			if err != nil {
 				sock.close()
+				// blackhole all pending writes. See #31
+				go func() {
+					for _ = range sock.upstreamBuf.out {
+						// pass
+					}
+				}()
 				return
 			}
 		}
