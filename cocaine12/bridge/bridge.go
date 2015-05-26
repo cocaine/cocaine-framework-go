@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/context"
+
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
 )
 
@@ -65,7 +67,7 @@ func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 
 	endpoint := cfg.Endpoint()
 
-	worker.SetFallbackHandler(func(event string, request cocaine.Request, response cocaine.Response) {
+	worker.SetFallbackHandler(func(ctx context.Context, event string, request cocaine.Request, response cocaine.Response) {
 		defer response.Close()
 
 		// Read the first chunk
