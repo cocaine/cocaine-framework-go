@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type ServiceInfo struct {
@@ -18,7 +20,8 @@ type Channel interface {
 }
 
 type Rx interface {
-	Get(timeout ...time.Duration) (ServiceResult, error)
+	Get() (ServiceResult, error)
+	GetWithTimeout(timeout time.Duration) (ServiceResult, error)
 	Push(ServiceResult)
 }
 
@@ -36,16 +39,16 @@ type rx struct {
 	pollBuffer <-chan ServiceResult
 }
 
-func (rx *rx) Get(timeout ...time.Duration) (ServiceResult, error) {
-	var chanTimeout <-chan time.Time
-	if len(timeout) == 1 {
-		chanTimeout = time.After(timeout[0])
-	}
+func (rx *rx) Get() (ServiceResult, error) {
+	res := <-rx.pollBuffer
+	return res, nil
+}
 
+func (rx *rx) GetWithTimeout(timeout time.Duration) (ServiceResult, error) {
 	select {
 	case res := <-rx.pollBuffer:
 		return res, nil
-	case <-chanTimeout:
+	case <-time.After(timeout):
 		return nil, fmt.Errorf("Timeout error")
 	}
 }
@@ -126,14 +129,14 @@ type Service struct {
 
 //Creates new service instance with specifed name.
 //Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
-func serviceResolve(name string, args ...string) (info *ServiceInfo, err error) {
-	l, err := NewLocator(args...)
+func serviceResolve(ctx context.Context, name string, endpoints []string) (info *ServiceInfo, err error) {
+	l, err := NewLocator(endpoints)
 	if err != nil {
 		return
 	}
 	defer l.Close()
 
-	ch, err := l.Resolve(name)
+	ch, err := l.Resolve(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -145,17 +148,21 @@ func serviceResolve(name string, args ...string) (info *ServiceInfo, err error) 
 }
 
 func serviceCreateIO(endpoints []EndpointItem) (sock socketIO, err error) {
+CONN_LOOP:
 	for _, endpoint := range endpoints {
 		sock, err = newAsyncConnection("tcp", endpoint.String(), time.Second*1)
 		if err != nil {
 			continue
 		}
+
+		break CONN_LOOP
 	}
+
 	return
 }
 
-func NewService(name string, args ...string) (s *Service, err error) {
-	info, err := serviceResolve(name, args...)
+func NewService(ctx context.Context, name string, endpoints []string) (s *Service, err error) {
+	info, err := serviceResolve(ctx, name, endpoints)
 	if err != nil {
 		err = fmt.Errorf("Unable to resolve service %s", name)
 		return
@@ -171,7 +178,7 @@ func NewService(name string, args ...string) (s *Service, err error) {
 		ServiceInfo:    info,
 		sessions:       newSessions(),
 		stop:           make(chan struct{}),
-		args:           args,
+		args:           endpoints,
 		name:           name,
 		isReconnecting: false,
 	}
@@ -224,7 +231,7 @@ func (service *Service) Reconnect(force bool) error {
 		}
 
 		// Create new socket
-		info, err := serviceResolve(service.name, service.args...)
+		info, err := serviceResolve(context.Background(), service.name, service.args)
 		if err != nil {
 			return err
 		}

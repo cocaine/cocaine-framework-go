@@ -2,6 +2,8 @@ package cocaine12
 
 import (
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 type ResolveChannelResult struct {
@@ -13,14 +15,25 @@ type Locator struct {
 	*Service
 }
 
-func NewLocator(args ...string) (*Locator, error) {
-	endpoint := DefaultLocator
-
-	if len(args) == 1 {
-		endpoint = args[0]
+func NewLocator(endpoints []string) (*Locator, error) {
+	if len(endpoints) == 0 {
+		endpoints = append(endpoints, DefaultLocator)
 	}
 
-	sock, err := newAsyncConnection("tcp", endpoint, time.Second*5)
+	var (
+		sock socketIO
+		err  error
+	)
+
+CONN_LOOP:
+	for _, endpoint := range endpoints {
+		sock, err = newAsyncConnection("tcp", endpoint, time.Second*1)
+		if err != nil {
+			continue
+		}
+		break CONN_LOOP
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +43,7 @@ func NewLocator(args ...string) (*Locator, error) {
 		socketIO:       sock,
 		sessions:       newSessions(),
 		stop:           make(chan struct{}),
-		args:           args,
+		args:           endpoints,
 		name:           "locator",
 		isReconnecting: false,
 	}
@@ -42,7 +55,7 @@ func NewLocator(args ...string) (*Locator, error) {
 	return l, nil
 }
 
-func (l *Locator) Resolve(name string) (<-chan ResolveChannelResult, error) {
+func (l *Locator) Resolve(ctx context.Context, name string) (<-chan ResolveChannelResult, error) {
 	Out := make(chan ResolveChannelResult, 1)
 	channel, err := l.Service.Call("resolve", name)
 	if err != nil {

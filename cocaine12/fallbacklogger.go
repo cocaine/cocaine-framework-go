@@ -10,6 +10,12 @@ type fallbackLogger struct {
 	severity Severity
 }
 
+func newFallbackLogger(args ...string) (Logger, error) {
+	return &fallbackLogger{
+		severity: DebugLevel,
+	}, nil
+}
+
 func (f *fallbackLogger) WithFields(fields Fields) *Entry {
 	return &Entry{
 		Logger: f,
@@ -52,11 +58,11 @@ func (f *fallbackLogger) log(level Severity, fields Fields, msg string, args ...
 	}
 }
 
-func (f *fallbackLogger) Errf(format string, args ...interface{}) {
+func (f *fallbackLogger) Errorf(format string, args ...interface{}) {
 	f.log(ErrorLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Err(format string) {
+func (f *fallbackLogger) Error(format string) {
 	f.log(ErrorLevel, defaultFields, format)
 }
 

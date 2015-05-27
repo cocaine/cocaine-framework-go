@@ -5,8 +5,8 @@ const defaultLoggerName = "logging"
 type Fields map[string]interface{}
 
 type EntryLogger interface {
-	Errf(format string, args ...interface{})
-	Err(format string)
+	Errorf(format string, args ...interface{})
+	Error(format string)
 
 	Warnf(format string, args ...interface{})
 	Warn(format string)
@@ -37,5 +37,10 @@ var defaultFields = Fields{}
 // NewLogger tries to create a cocaine.Logger. It fallbacks to a simple implementation
 // if the cocaine.Logger is unavailable
 func NewLogger(args ...string) (Logger, error) {
-	return &fallbackLogger{}, nil
+	l, err := newCocaineLogger("logging")
+	if err != nil {
+		return newFallbackLogger()
+	}
+
+	return l, err
 }
