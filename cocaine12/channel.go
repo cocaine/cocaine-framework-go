@@ -1,9 +1,8 @@
 package cocaine12
 
 import (
-	// "fmt"
+	"fmt"
 	"sync"
-	"sync/atomic"
 	// "time"
 )
 
@@ -19,7 +18,7 @@ type Rx interface {
 }
 
 type Tx interface {
-	// Call(name string, args ...interface{}) error
+	Call(name string, args ...interface{}) error
 }
 
 type channel struct {
@@ -29,68 +28,82 @@ type channel struct {
 
 type rx struct {
 	pushBuffer chan ServiceResult
+	rxTree     *StreamDescription
 
 	sync.Mutex
-	queue   []ServiceResult
-	pending int32
-}
-
-func (rx *rx) enqueue() {
-	atomic.AddInt32(&(rx.pending), 1)
-}
-
-func (rx *rx) dequeue() {
-	atomic.AddInt32(&(rx.pending), -1)
-}
-
-func (rx *rx) ispending() bool {
-	return atomic.LoadInt32(&(rx.pending)) > 0
+	queue []ServiceResult
 }
 
 func (rx *rx) Get() (ServiceResult, error) {
 	var res ServiceResult
+
+	// fast path
+	select {
+	case res = <-rx.pushBuffer:
+		return res, nil
+	default:
+	}
+
 	rx.Lock()
 	if len(rx.queue) > 0 {
 		res = rx.queue[0]
-		rx.queue = rx.queue[1:]
+		select {
+		case rx.pushBuffer <- res:
+			rx.queue = rx.queue[1:]
+		default:
+		}
 	}
-	rx.enqueue()
 	rx.Unlock()
 	res = <-rx.pushBuffer
 	return res, nil
 }
 
-// func (rx *rx) GetWithTimeout(timeout time.Duration) (ServiceResult, error) {
-// 	rx.enqueugetter()
-// 	select {
-// 	case res := <-rx.pollBuffer:
-// 		return res, nil
-// 	case <-time.After(timeout):
-// 		return nil, fmt.Errorf("Timeout error")
-// 	}
-// }
-
 func (rx *rx) Push(res ServiceResult) {
-	// fast path
+	rx.Lock()
+	rx.queue = append(rx.queue, res)
 	select {
-	case rx.pushBuffer <- res:
-		rx.dequeue()
+	case rx.pushBuffer <- rx.queue[0]:
+		rx.queue = rx.queue[1:]
 	default:
 	}
-
-	rx.Lock()
-	defer rx.Unlock()
-	if !rx.ispending() {
-		rx.pushBuffer <- res
-		rx.dequeue()
-		return
-	}
-
-	rx.queue = append(rx.queue, res)
+	rx.Unlock()
 }
 
 type tx struct {
 	service *Service
+	txTree  *StreamDescription
 	id      uint64
-	txChan  chan ServiceResult
+	done    bool
+}
+
+func (tx *tx) Call(name string, args ...interface{}) error {
+	if tx.done {
+		return fmt.Errorf("tx is done")
+	}
+
+	method, err := tx.txTree.MethodByName(name)
+	if err != nil {
+		return err
+	}
+
+	z := *(tx.txTree)
+	temp := z[method]
+	switch temp.StreamDescription {
+	case EmptyDescription:
+		tx.done = true
+	case RecursiveDescription:
+		//pass
+	default:
+		tx.txTree = temp.StreamDescription
+	}
+
+	msg := &Message{
+		CommonMessageInfo{
+			tx.id,
+			method},
+		args,
+	}
+
+	tx.service.sendMsg(msg)
+	return nil
 }

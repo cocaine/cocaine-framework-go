@@ -39,6 +39,16 @@ type DispatchItem struct {
 
 type StreamDescription map[uint64]*StreamDescriptionItem
 
+func (s *StreamDescription) MethodByName(name string) (uint64, error) {
+	for i, v := range *s {
+		if v.Name == name {
+			return i, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no `%s` method", name)
+}
+
 type StreamDescriptionItem struct {
 	Name string
 	*StreamDescription

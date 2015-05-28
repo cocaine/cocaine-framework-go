@@ -201,7 +201,7 @@ func (service *Service) Reconnect(force bool) error {
 		go service.loop()
 		return nil
 	}
-	return fmt.Errorf("%s", "Service is reconnecting now")
+	return fmt.Errorf("Service is reconnecting now")
 }
 
 func (service *Service) call(name string, args ...interface{}) (Channel, error) {
@@ -212,14 +212,18 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 
 	ch := channel{
 		rx: rx{
-			pushBuffer: make(chan ServiceResult),
+			pushBuffer: make(chan ServiceResult, 1),
+			rxTree:     service.ServiceInfo.API[methodNum].Upstream,
 		},
 		tx: tx{
 			service: service,
+			txTree:  service.ServiceInfo.API[methodNum].Downstream,
 			id:      0,
+			done:    false,
 		},
 	}
-	ch.tx.id = service.sessions.Attach(&ch.rx)
+
+	ch.tx.id = service.sessions.Attach(&ch)
 
 	// FIX THIS!!!
 	msg := &Message{
