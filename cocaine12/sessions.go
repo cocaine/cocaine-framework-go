@@ -17,6 +17,15 @@ func newSessions() *sessions {
 	}
 }
 
+func (s *sessions) Next() uint64 {
+	s.Lock()
+	s.counter++
+	i := s.counter
+	s.Unlock()
+
+	return i
+}
+
 func (s *sessions) Attach(session Channel) uint64 {
 	s.Lock()
 

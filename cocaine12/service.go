@@ -279,8 +279,13 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 			methodNum},
 		args,
 	}
-	service.socketIO.Write() <- msg
+
+	service.sendMsg(msg)
 	return &ch, nil
+}
+
+func (service *Service) sendMsg(msg *Message) {
+	service.socketIO.Write() <- msg
 }
 
 //Calls a remote method by name and pass args

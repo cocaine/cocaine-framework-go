@@ -7,6 +7,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const loggerEmit = 0
+
 type cocaineLogger struct {
 	*Service
 	severity Severity
@@ -89,11 +91,25 @@ func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 }
 
 func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
+	var methodArgs []interface{}
 	if len(args) > 0 {
-		c.Service.Call("emit", level, defaultAppName, fmt.Sprintf(msg, args...), c.formatFields(fields))
+		// c.Service.Call("emit", level, defaultAppName, fmt.Sprintf(msg, args...), c.formatFields(fields))
+		methodArgs = []interface{}{level, defaultAppName, fmt.Sprintf(msg, args...), c.formatFields(fields)}
 	} else {
-		c.Service.Call("emit", level, defaultAppName, msg, c.formatFields(fields))
+		// c.Service.Call("emit", level, defaultAppName, msg, c.formatFields(fields))
+		methodArgs = []interface{}{level, defaultAppName, msg, c.formatFields(fields)}
 	}
+
+	i := c.Service.sessions.Next()
+
+	loggermsg := &Message{
+		CommonMessageInfo{
+			i,
+			loggerEmit},
+		methodArgs,
+	}
+
+	c.Service.sendMsg(loggermsg)
 }
 
 func (c *cocaineLogger) Debug(msg string) {
