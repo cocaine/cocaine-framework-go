@@ -14,7 +14,7 @@ type Channel interface {
 type Rx interface {
 	Get() (ServiceResult, error)
 	// GetWithTimeout(timeout time.Duration) (ServiceResult, error)
-	Push(ServiceResult)
+	push(ServiceResult)
 }
 
 type Tx interface {
@@ -54,11 +54,12 @@ func (rx *rx) Get() (ServiceResult, error) {
 		}
 	}
 	rx.Unlock()
+
 	res = <-rx.pushBuffer
 	return res, nil
 }
 
-func (rx *rx) Push(res ServiceResult) {
+func (rx *rx) push(res ServiceResult) {
 	rx.Lock()
 	rx.queue = append(rx.queue, res)
 	select {
@@ -86,8 +87,8 @@ func (tx *tx) Call(name string, args ...interface{}) error {
 		return err
 	}
 
-	z := *(tx.txTree)
-	temp := z[method]
+	treeMap := *(tx.txTree)
+	temp := treeMap[method]
 	switch temp.StreamDescription {
 	case EmptyDescription:
 		tx.done = true

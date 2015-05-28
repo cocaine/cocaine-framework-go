@@ -140,7 +140,7 @@ func NewService(ctx context.Context, name string, endpoints []string) (s *Servic
 func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
 		if rx, ok := service.sessions.Get(data.Session); ok {
-			rx.Push(&serviceRes{
+			rx.push(&serviceRes{
 				payload: data.Payload,
 				method:  data.MsgType,
 			})
@@ -172,7 +172,7 @@ func (service *Service) Reconnect(force bool) error {
 		for _, key := range service.sessions.Keys() {
 			service.sessions.RLock()
 			if ch, ok := service.sessions.Get(key); ok {
-				ch.Push(&serviceRes{
+				ch.push(&serviceRes{
 					payload: nil,
 					method:  1,
 					err:     &ServiceError{-100, "Disconnected"}})
