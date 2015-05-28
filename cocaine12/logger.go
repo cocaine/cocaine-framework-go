@@ -5,17 +5,17 @@ const defaultLoggerName = "logging"
 type Fields map[string]interface{}
 
 type EntryLogger interface {
-	Errorf(format string, args ...interface{})
-	Error(format string)
+	Errf(format string, args ...interface{})
+	Err(args ...interface{})
 
 	Warnf(format string, args ...interface{})
-	Warn(format string)
+	Warn(args ...interface{})
 
 	Infof(format string, args ...interface{})
-	Info(format string)
+	Info(args ...interface{})
 
 	Debugf(format string, args ...interface{})
-	Debug(format string)
+	Debug(args ...interface{})
 }
 
 // Logger represents an interface for a cocaine.Logger

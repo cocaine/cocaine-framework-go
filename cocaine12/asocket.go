@@ -228,7 +228,7 @@ func (sock *asyncRWSocket) writeloop() {
 				sock.close()
 				// blackhole all pending writes. See #31
 				go func() {
-					for range sock.upstreamBuf.out {
+					for _ = range sock.upstreamBuf.out {
 						// pass
 					}
 				}()
