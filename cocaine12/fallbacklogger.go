@@ -62,32 +62,32 @@ func (f *fallbackLogger) Errorf(format string, args ...interface{}) {
 	f.log(ErrorLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Error(format string) {
-	f.log(ErrorLevel, defaultFields, format)
+func (f *fallbackLogger) Error(args ...interface{}) {
+	f.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (f *fallbackLogger) Warnf(format string, args ...interface{}) {
 	f.log(WarnLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Warn(format string) {
-	f.log(WarnLevel, defaultFields, format)
+func (f *fallbackLogger) Warn(args ...interface{}) {
+	f.log(WarnLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (f *fallbackLogger) Infof(format string, args ...interface{}) {
 	f.log(InfoLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Info(format string) {
-	f.log(InfoLevel, defaultFields, format)
+func (f *fallbackLogger) Info(args ...interface{}) {
+	f.log(InfoLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (f *fallbackLogger) Debugf(format string, args ...interface{}) {
 	f.log(DebugLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Debug(format string) {
-	f.log(DebugLevel, defaultFields, format)
+func (f *fallbackLogger) Debug(args ...interface{}) {
+	f.log(DebugLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (f *fallbackLogger) Verbosity() Severity {

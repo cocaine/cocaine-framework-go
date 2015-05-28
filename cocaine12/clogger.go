@@ -96,32 +96,32 @@ func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...i
 	}
 }
 
-func (c *cocaineLogger) Debug(msg string) {
-	c.log(DebugLevel, defaultFields, msg)
+func (c *cocaineLogger) Debug(args ...interface{}) {
+	c.log(DebugLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (c *cocaineLogger) Debugf(msg string, args ...interface{}) {
 	c.log(DebugLevel, defaultFields, msg, args...)
 }
 
-func (c *cocaineLogger) Info(msg string) {
-	c.log(InfoLevel, defaultFields, msg)
+func (c *cocaineLogger) Info(args ...interface{}) {
+	c.log(InfoLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (c *cocaineLogger) Infof(msg string, args ...interface{}) {
 	c.log(InfoLevel, defaultFields, msg, args...)
 }
 
-func (c *cocaineLogger) Warn(msg string) {
-	c.log(WarnLevel, defaultFields, msg)
+func (c *cocaineLogger) Warn(args ...interface{}) {
+	c.log(WarnLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (c *cocaineLogger) Warnf(msg string, args ...interface{}) {
 	c.log(WarnLevel, defaultFields, msg, args...)
 }
 
-func (c *cocaineLogger) Error(msg string) {
-	c.log(ErrorLevel, defaultFields, msg)
+func (c *cocaineLogger) Error(args ...interface{}) {
+	c.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
 }
 
 func (c *cocaineLogger) Errorf(msg string, args ...interface{}) {
