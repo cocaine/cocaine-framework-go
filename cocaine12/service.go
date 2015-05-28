@@ -14,55 +14,6 @@ type ServiceInfo struct {
 	API       DispatchMap
 }
 
-type Channel interface {
-	Rx
-	Tx
-}
-
-type Rx interface {
-	Get() (ServiceResult, error)
-	GetWithTimeout(timeout time.Duration) (ServiceResult, error)
-	Push(ServiceResult)
-}
-
-type Tx interface {
-	// Call(name string, args ...interface{}) error
-}
-
-type channel struct {
-	rx
-	tx
-}
-
-type rx struct {
-	pushBuffer chan ServiceResult
-	pollBuffer <-chan ServiceResult
-}
-
-func (rx *rx) Get() (ServiceResult, error) {
-	res := <-rx.pollBuffer
-	return res, nil
-}
-
-func (rx *rx) GetWithTimeout(timeout time.Duration) (ServiceResult, error) {
-	select {
-	case res := <-rx.pollBuffer:
-		return res, nil
-	case <-time.After(timeout):
-		return nil, fmt.Errorf("Timeout error")
-	}
-}
-
-func (rx *rx) Push(res ServiceResult) {
-	rx.pushBuffer <- res
-}
-
-type tx struct {
-	service *Service
-	id      uint64
-	txChan  chan ServiceResult
-}
-
 type ServiceResult interface {
 	Extract(interface{}) error
 	Result() (uint64, []interface{}, error)
@@ -259,11 +210,9 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 		return nil, err
 	}
 
-	in, out := service.getServiceChanPair()
 	ch := channel{
 		rx: rx{
-			pushBuffer: in,
-			pollBuffer: out,
+			pushBuffer: make(chan ServiceResult),
 		},
 		tx: tx{
 			service: service,
