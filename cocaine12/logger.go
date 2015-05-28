@@ -5,8 +5,8 @@ const defaultLoggerName = "logging"
 type Fields map[string]interface{}
 
 type EntryLogger interface {
-	Errorf(format string, args ...interface{})
-	Error(args ...interface{})
+	Errf(format string, args ...interface{})
+	Err(args ...interface{})
 
 	Warnf(format string, args ...interface{})
 	Warn(args ...interface{})

@@ -120,10 +120,10 @@ func (c *cocaineLogger) Warnf(msg string, args ...interface{}) {
 	c.log(WarnLevel, defaultFields, msg, args...)
 }
 
-func (c *cocaineLogger) Error(args ...interface{}) {
+func (c *cocaineLogger) Err(args ...interface{}) {
 	c.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
 }
 
-func (c *cocaineLogger) Errorf(msg string, args ...interface{}) {
+func (c *cocaineLogger) Errf(msg string, args ...interface{}) {
 	c.log(ErrorLevel, defaultFields, msg, args...)
 }

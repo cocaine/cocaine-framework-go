@@ -58,11 +58,11 @@ func (f *fallbackLogger) log(level Severity, fields Fields, msg string, args ...
 	}
 }
 
-func (f *fallbackLogger) Errorf(format string, args ...interface{}) {
+func (f *fallbackLogger) Errf(format string, args ...interface{}) {
 	f.log(ErrorLevel, defaultFields, format, args...)
 }
 
-func (f *fallbackLogger) Error(args ...interface{}) {
+func (f *fallbackLogger) Err(args ...interface{}) {
 	f.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
 }
 
