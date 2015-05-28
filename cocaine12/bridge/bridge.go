@@ -170,7 +170,7 @@ func (b *Bridge) Start() error {
 		}
 
 		if err := buf.Err(); err != nil {
-			b.logger.Errorf("unable to read stdout %v", err)
+			b.logger.Errf("unable to read stdout %v", err)
 		}
 	}()
 
@@ -181,7 +181,7 @@ func (b *Bridge) Start() error {
 		}
 
 		if err := buf.Err(); err != nil {
-			b.logger.Errorf("unable to read stderr: %v", err)
+			b.logger.Errf("unable to read stderr: %v", err)
 		}
 	}()
 

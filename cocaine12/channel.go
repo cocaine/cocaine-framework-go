@@ -81,12 +81,8 @@ func (rx *rx) Push(res ServiceResult) {
 	rx.Lock()
 	defer rx.Unlock()
 	if !rx.ispending() {
-		select {
-		case rx.pushBuffer <- res:
-			rx.dequeue()
-		default:
-			// for future usage
-		}
+		rx.pushBuffer <- res
+		rx.dequeue()
 		return
 	}
 
