@@ -36,12 +36,24 @@ func (cfg *BridgeConfig) Endpoint() string {
 	return fmt.Sprintf("localhost:%d", cfg.Port)
 }
 
+//Remove some cocaine-specific args
+func filterEndpointArg(args []string) []string {
+	for i, arg := range args {
+		if arg == "--endpoint" && len(args)-1 >= i+1 {
+			// cut both the argname and value
+			return append(args[:i], args[i+2:]...)
+		}
+	}
+
+	return args
+}
+
 func DefaultBridgeConfig() *BridgeConfig {
 	name := "slave"
 
 	cfg := &BridgeConfig{
 		Name: name,
-		Args: os.Args[1:],
+		Args: filterEndpointArg(os.Args[1:]),
 		Env:  os.Environ(),
 		Port: 8080,
 	}
