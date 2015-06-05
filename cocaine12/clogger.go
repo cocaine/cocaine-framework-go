@@ -14,12 +14,12 @@ type cocaineLogger struct {
 	severity Severity
 }
 
-func newCocaineLogger(name string) (Logger, error) {
+func newCocaineLogger(name string, endpoints ...string) (Logger, error) {
 	timeout := time.Second * 5
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	service, err := NewService(ctx, name, nil)
+	service, err := NewService(ctx, name, endpoints)
 	if err != nil {
 		return nil, err
 	}
