@@ -13,7 +13,7 @@ var (
 	method  = "GET"
 	uri     = "/path?a=1"
 	version = "1.1"
-	headers = []interface{}{
+	headers = [][2]string{
 		[2]string{"Content-Type", "text/html"},
 		[2]string{"X-Cocaine-Service", "Test"},
 		[2]string{"X-Cocaine-Service", "Test2"},
@@ -28,6 +28,16 @@ func gzipedBody() []byte {
 	w.Write([]byte("hello, world\n"))
 	w.Close()
 	return b.Bytes()
+}
+
+func packTestReq(req []interface{}) []byte {
+	var out []byte
+	codec.NewEncoderBytes(&out, h).Encode(req)
+	return out
+}
+
+func testUnpackHttpChunk(payload []interface{}, res interface{}) error {
+	return codec.NewDecoderBytes(payload[0].([]byte), hHTTPReq).Decode(res)
 }
 
 func TestHTTPDecoder(t *testing.T) {

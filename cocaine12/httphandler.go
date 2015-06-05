@@ -33,7 +33,10 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 		Body    []byte
 	}
 
-	codec.NewDecoderBytes(raw, hHTTPReq).Decode(&v)
+	if err := codec.NewDecoderBytes(raw, hHTTPReq).Decode(&v); err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest(v.Method, v.URI, bytes.NewBuffer(v.Body))
 	if err != nil {
 		return nil, err
@@ -60,12 +63,14 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 }
 
 // WriteHead converts the HTTP status code and the headers to the cocaine format
-func WriteHead(code int, headers Headers) interface{} {
-	return []interface{}{code, headers}
+func WriteHead(code int, headers Headers) []byte {
+	var out []byte
+	codec.NewEncoderBytes(&out, h).Encode([]interface{}{code, headers})
+	return out
 }
 
 func HeadersHTTPtoCocaine(header http.Header) Headers {
-	hdr := make(Headers, len(header))
+	hdr := make(Headers, 0, len(header))
 	for headerName, headerValues := range header {
 		for _, headerValue := range headerValues {
 			hdr = append(hdr, [2]string{headerName, headerValue})
@@ -122,19 +127,19 @@ func WrapHandler(handler http.Handler) EventHandler {
 		if err != nil {
 			if IsTimeout(err) {
 				response.Write(WriteHead(http.StatusRequestTimeout, Headers{}))
-				response.Write("request was not received during a timeout")
+				response.Write([]byte("request was not received during a timeout"))
 				return
 			}
 
 			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
-			response.Write("cannot process request " + err.Error())
+			response.Write([]byte("cannot process request " + err.Error()))
 			return
 		}
 
 		httpRequest, err := UnpackProxyRequest(msg)
 		if err != nil {
 			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
-			response.Write("malformed request")
+			response.Write([]byte("malformed request"))
 			return
 		}
 

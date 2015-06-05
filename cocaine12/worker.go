@@ -39,7 +39,7 @@ type Request interface {
 
 // ResponseStream provides an interface for a handler to reply
 type ResponseStream interface {
-	Write(data interface{})
+	Write(data []byte)
 	ErrorMsg(code int, message string)
 	Close()
 }

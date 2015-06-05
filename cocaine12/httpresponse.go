@@ -70,16 +70,16 @@ func (w *ResponseWriter) bodyAllowed() bool {
 
 // Write writes the data to the connection as part of an HTTP reply
 func (w *ResponseWriter) Write(data []byte) (n int, err error) {
-	return w.write(len(data), data, "")
+	return w.write(len(data), data)
 }
 
 // WriteString writes the string to the connection as part of an HTTP reply
 func (w *ResponseWriter) WriteString(data string) (n int, err error) {
-	return w.write(len(data), nil, data)
+	return w.write(len(data), []byte(data))
 }
 
 // either dataB or dataS is non-zero.
-func (w *ResponseWriter) write(lenData int, dataB []byte, dataS string) (n int, err error) {
+func (w *ResponseWriter) write(lenData int, data []byte) (n int, err error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
@@ -97,11 +97,6 @@ func (w *ResponseWriter) write(lenData int, dataB []byte, dataS string) (n int, 
 		return 0, http.ErrContentLength
 	}
 
-	if dataB != nil {
-		w.cRes.Write(dataB)
-		return len(dataB), nil
-	}
-
-	w.cRes.Write(dataS)
-	return len(dataS), nil
+	w.cRes.Write(data)
+	return len(data), nil
 }

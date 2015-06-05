@@ -114,7 +114,7 @@ func newResponse(session uint64, toWorker chan *Message) *response {
 }
 
 // Sends chunk of data to a client.
-func (r *response) Write(data interface{}) {
+func (r *response) Write(data []byte) {
 	if r.isClosed() {
 		return
 	}

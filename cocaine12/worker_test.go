@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
 
@@ -69,6 +70,12 @@ func TestWorker(t *testing.T) {
 			res.ErrorMsg(-100, "dummyError")
 		},
 		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, method, r.Method)
+			assert.Equal(t, "HTTP/"+version, r.Proto)
+			assert.Equal(t, r.URL.String(), uri)
+			assert.Equal(t, headersCocaineToHTTP(headers), r.Header)
+			w.Header().Add("X-Test", "Test")
+			w.WriteHeader(http.StatusProxyAuthRequired)
 			fmt.Fprintf(w, "OK")
 		}),
 		"panic": func(ctx context.Context, req Request, res Response) {
@@ -86,23 +93,23 @@ func TestWorker(t *testing.T) {
 	sock2.Write() <- corrupted
 
 	sock2.Write() <- newInvoke(testSession, "test")
-	sock2.Write() <- newChunk(testSession, "Dummy")
+	sock2.Write() <- newChunk(testSession, []byte("Dummy"))
 	sock2.Write() <- newChoke(testSession)
 
 	sock2.Write() <- newInvoke(testSession+1, "http")
-	sock2.Write() <- newChunk(testSession+1, req)
+	sock2.Write() <- newChunk(testSession+1, packTestReq(req))
 	sock2.Write() <- newChoke(testSession + 1)
 
 	sock2.Write() <- newInvoke(testSession+2, "error")
-	sock2.Write() <- newChunk(testSession+2, "Dummy")
+	sock2.Write() <- newChunk(testSession+2, []byte("Dummy"))
 	sock2.Write() <- newChoke(testSession + 2)
 
 	sock2.Write() <- newInvoke(testSession+3, "BadEvent")
-	sock2.Write() <- newChunk(testSession+3, "Dummy")
+	sock2.Write() <- newChunk(testSession+3, []byte("Dummy"))
 	sock2.Write() <- newChoke(testSession + 3)
 
 	sock2.Write() <- newInvoke(testSession+4, "panic")
-	sock2.Write() <- newChunk(testSession+4, "Dummy")
+	sock2.Write() <- newChunk(testSession+4, []byte("Dummy"))
 	sock2.Write() <- newChoke(testSession + 4)
 
 	// handshake
@@ -128,14 +135,25 @@ func TestWorker(t *testing.T) {
 	// test event
 	eChunk := <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession, chunkType)
+	assert.Equal(t, []byte("Dummy"), eChunk.Payload[0])
 	eChoke := <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession, chokeType)
 
 	// http event
+	// status code & headers
 	eChunk = <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
+	var firstChunk struct {
+		Status  int
+		Headers [][2]string
+	}
+	assert.NoError(t, testUnpackHttpChunk(eChunk.Payload, &firstChunk))
+	assert.Equal(t, http.StatusProxyAuthRequired, firstChunk.Status, "http: invalid status code")
+	assert.Equal(t, [][2]string{[2]string{"X-Test", "Test"}}, firstChunk.Headers, "http: headers")
+	// body
 	eChunk = <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
+	assert.Equal(t, eChunk.Payload[0].([]byte), []byte("OK"), "http: invalid body")
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+1, chokeType)
 

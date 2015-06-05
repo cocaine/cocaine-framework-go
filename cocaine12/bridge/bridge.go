@@ -89,19 +89,19 @@ func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 		if err != nil {
 			if cocaine.IsTimeout(err) {
 				response.Write(cocaine.WriteHead(http.StatusRequestTimeout, cocaine.Headers{}))
-				response.Write("request was not received during a timeout")
+				response.Write([]byte("request was not received during a timeout"))
 				return
 			}
 
 			response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
-			response.Write("cannot process request " + err.Error())
+			response.Write([]byte("cannot process request " + err.Error()))
 			return
 		}
 
 		httpRequest, err := cocaine.UnpackProxyRequest(msg)
 		if err != nil {
 			response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
-			response.Write(fmt.Sprintf("malformed request: %v", err))
+			response.Write([]byte(fmt.Sprintf("malformed request: %v", err)))
 			return
 		}
 
@@ -112,7 +112,7 @@ func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 		appResp, err := http.DefaultClient.Do(httpRequest)
 		if err != nil {
 			response.Write(cocaine.WriteHead(http.StatusInternalServerError, cocaine.Headers{}))
-			response.Write(fmt.Sprintf("unable to proxy a request: %v", err))
+			response.Write([]byte(fmt.Sprintf("unable to proxy a request: %v", err)))
 			return
 		}
 		defer appResp.Body.Close()

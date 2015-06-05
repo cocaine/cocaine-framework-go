@@ -62,16 +62,13 @@ func newInvoke(session uint64, event string) *Message {
 	}
 }
 
-func newChunk(session uint64, data interface{}) *Message {
-	var res []byte
-	codec.NewEncoderBytes(&res, h).Encode(data)
-
+func newChunk(session uint64, data []byte) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
 			MsgType: chunkType,
 		},
-		Payload: []interface{}{res},
+		Payload: []interface{}{data},
 	}
 }
 
