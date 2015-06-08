@@ -33,7 +33,7 @@ func newDeafults(args []string) *defaultsValues {
 	flag.StringVar(&values.Endpoint, "endpoint", "", "unix socket path to connect to the Cocaine")
 	flag.StringVar(&locators, "locator", "localhost:10053", "default endpoints of locators")
 	flag.IntVar(&values.Protocol, "protocol", 0, "protocol version")
-	flag.StringVar(&values.UUID, "uuid", "00000000-00000000-00000000-00000000", "UUID")
+	flag.StringVar(&values.UUID, "uuid", "", "UUID")
 
 	flagSet.Parse(args)
 	values.Locators = parseLocators(locators)
