@@ -17,7 +17,7 @@ type Locator struct {
 
 func NewLocator(endpoints []string) (*Locator, error) {
 	if len(endpoints) == 0 {
-		endpoints = append(endpoints, DefaultLocator)
+		endpoints = append(endpoints, defaults.Locators...)
 	}
 
 	var (

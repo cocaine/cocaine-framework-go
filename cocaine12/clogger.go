@@ -93,9 +93,9 @@ func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
 	var methodArgs []interface{}
 	if len(args) > 0 {
-		methodArgs = []interface{}{level, defaultAppName, fmt.Sprintf(msg, args...), c.formatFields(fields)}
+		methodArgs = []interface{}{level, defaults.AppName, fmt.Sprintf(msg, args...), c.formatFields(fields)}
 	} else {
-		methodArgs = []interface{}{level, defaultAppName, msg, c.formatFields(fields)}
+		methodArgs = []interface{}{level, defaults.AppName, msg, c.formatFields(fields)}
 	}
 
 	i := c.Service.sessions.Next()

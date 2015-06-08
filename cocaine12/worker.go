@@ -2,7 +2,6 @@ package cocaine12
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"runtime/debug"
 	"time"
@@ -105,13 +104,15 @@ type Worker struct {
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
 func NewWorker() (*Worker, error) {
-	setupFlags()
-	flag.Parse()
+	workerID := defaults.UUID
 
-	workerID := flagUUID
+	unixSocketEndpoint := defaults.Endpoint
+	if unixSocketEndpoint == "" {
+		return nil, fmt.Errorf("cocaine endpoint must be specified")
+	}
 
 	// Connect to cocaine-runtime over a unix socket
-	sock, err := newUnixConnection(flagEndpoint, coreConnectionTimeout)
+	sock, err := newUnixConnection(unixSocketEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}

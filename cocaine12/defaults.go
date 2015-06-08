@@ -2,21 +2,41 @@ package cocaine12
 
 import (
 	"flag"
+	"os"
+	"strings"
 )
 
-var (
-	// DefaultLocator is used by Locator to resolve services by default
-	DefaultLocator = ":10053"
+type defaultsValues struct {
+	AppName  string
+	Endpoint string
+	Locators []string
+	Protocol int
+	UUID     string
+}
 
-	defaultAppName = "gostandalone"
+var defaults = newDeafults(os.Args[1:])
 
-	flagUUID     string
-	flagEndpoint string
-)
+func parseLocators(arg string) []string {
+	if strings.IndexRune(arg, ',') == -1 {
+		return []string{arg}
+	}
 
-func setupFlags() {
-	flag.StringVar(&flagUUID, "uuid", "", "UUID")
-	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&defaultAppName, "app", "standalone", "Connection path")
-	flag.StringVar(&DefaultLocator, "locator", "localhost:10053", "Connection path")
+	return strings.Split(arg, ",")
+}
+
+func newDeafults(args []string) *defaultsValues {
+	values := new(defaultsValues)
+	var locators string
+
+	flagSet := flag.NewFlagSet("cocaine", flag.ContinueOnError)
+	flag.StringVar(&values.AppName, "app", "gostandalone", "application name")
+	flag.StringVar(&values.Endpoint, "endpoint", "", "unix socket path to connect to the Cocaine")
+	flag.StringVar(&locators, "locator", "localhost:10053", "default endpoints of locators")
+	flag.IntVar(&values.Protocol, "protocol", 0, "protocol version")
+	flag.StringVar(&values.UUID, "uuid", "00000000-00000000-00000000-00000000", "UUID")
+
+	flagSet.Parse(args)
+	values.Locators = parseLocators(locators)
+
+	return values
 }
