@@ -54,7 +54,7 @@ func TestWorker(t *testing.T) {
 	in, out := testConn()
 	sock, _ := newAsyncRW(out)
 	sock2, _ := newAsyncRW(in)
-	w, err := newWorker(sock, testID)
+	w, err := newWorker(sock, testID, 0)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
@@ -188,7 +188,7 @@ func TestWorkerTermination(t *testing.T) {
 	in, out := testConn()
 	sock, _ := newAsyncRW(out)
 	sock2, _ := newAsyncRW(in)
-	w, err := newWorker(sock, testID)
+	w, err := newWorker(sock, testID, 0)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
