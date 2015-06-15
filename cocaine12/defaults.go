@@ -12,6 +12,7 @@ type defaultsValues struct {
 	Locators []string
 	Protocol int
 	UUID     string
+	Debug    bool
 }
 
 var defaults = newDeafults(os.Args[1:])
@@ -37,6 +38,8 @@ func newDeafults(args []string) *defaultsValues {
 
 	flagSet.Parse(args)
 	values.Locators = parseLocators(locators)
+
+	values.Debug = strings.ToUpper(os.Getenv("DEBUG")) == "DEBUG"
 
 	return values
 }

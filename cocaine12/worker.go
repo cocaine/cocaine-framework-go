@@ -100,6 +100,10 @@ type Worker struct {
 	fallbackHandler FallbackEventHandler
 	// if set recoverTrap sends Stack
 	debug bool
+	// protocol version id
+	protoVersion int
+	// protocol dispatcher
+	dispatcher protocolDispather
 }
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
@@ -117,10 +121,10 @@ func NewWorker() (*Worker, error) {
 		return nil, err
 	}
 
-	return newWorker(sock, workerID, defaults.Protocol)
+	return newWorker(sock, workerID, defaults.Protocol, defaults.Debug)
 }
 
-func newWorker(conn socketIO, id string, version int) (*Worker, error) {
+func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
 	w := &Worker{
 		conn: conn,
 		id:   id,
@@ -135,7 +139,9 @@ func newWorker(conn socketIO, id string, version int) (*Worker, error) {
 		stopped: make(chan struct{}),
 
 		fallbackHandler: DefaultFallbackEventHandler,
-		debug:           false,
+		debug:           debug,
+		protoVersion:    protoVersion,
+		dispatcher:      NewV0Protocol(),
 	}
 
 	// NewTimer launches timer
@@ -216,7 +222,7 @@ func (w *Worker) loop() error {
 		case msg, ok := <-w.conn.Read():
 			if ok {
 				// otherwise the connection is closed
-				w.onMessage(msg)
+				w.dispatcher.onMessage(w, msg)
 			}
 
 		case <-w.heartbeatTimer.C:
@@ -243,29 +249,6 @@ func (w *Worker) loop() error {
 	}
 }
 
-func (w *Worker) onMessage(msg *Message) {
-	switch msg.MsgType {
-	case chunkType:
-		w.onChunk(msg)
-
-	case chokeType:
-		w.onChoke(msg)
-
-	case invokeType:
-		w.onInvoke(msg)
-
-	case heartbeatType:
-		w.onHeartbeat(msg)
-
-	case terminateType:
-		w.onTerminate(msg)
-
-	default:
-		// Invalid message
-		fmt.Printf("invalid message type: %d, message %v", msg.MsgType, msg)
-	}
-}
-
 // A reply to heartbeat is not arrived during disownTimeout,
 // so it seems cocaine-runtime has died
 func (w *Worker) onDisownTimeout() {
@@ -274,7 +257,7 @@ func (w *Worker) onDisownTimeout() {
 
 func (w *Worker) onHeartbeatTimeout() {
 	select {
-	case w.conn.Write() <- newHeartbeatMessage():
+	case w.conn.Write() <- w.dispatcher.newHeartbeat():
 	case <-w.conn.IsClosed():
 	}
 
@@ -289,23 +272,23 @@ func (w *Worker) onHeartbeatTimeout() {
 // to notify runtime that we have started
 func (w *Worker) sendHandshake() {
 	select {
-	case w.conn.Write() <- newHandshake(w.id):
+	case w.conn.Write() <- w.dispatcher.newHandshake(w.id):
 	case <-w.conn.IsClosed():
 	}
 }
 
 // Message handlers
 
-func (w *Worker) onChunk(msg *Message) {
-	if reqStream, ok := w.sessions[msg.Session]; ok {
-		reqStream.push(msg)
-	}
-}
-
 func (w *Worker) onChoke(msg *Message) {
 	if reqStream, ok := w.sessions[msg.Session]; ok {
 		reqStream.Close()
 		delete(w.sessions, msg.Session)
+	}
+}
+
+func (w *Worker) onChunk(msg *Message) {
+	if reqStream, ok := w.sessions[msg.Session]; ok {
+		reqStream.push(msg)
 	}
 }
 
@@ -322,7 +305,7 @@ func (w *Worker) onInvoke(msg *Message) {
 	}
 
 	ctx := context.Background()
-	responseStream := newResponse(currentSession, w.fromHandlers)
+	responseStream := newResponse(w.dispatcher, currentSession, w.fromHandlers)
 	requestStream := newRequest()
 	w.sessions[currentSession] = requestStream
 

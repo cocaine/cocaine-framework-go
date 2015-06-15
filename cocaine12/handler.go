@@ -87,18 +87,20 @@ func (request *request) Close() {
 }
 
 type response struct {
+	handlerProtocolGenerator
 	session     uint64
 	fromHandler chan *Message
 	toWorker    chan *Message
 	closed      chan struct{}
 }
 
-func newResponse(session uint64, toWorker chan *Message) *response {
+func newResponse(h handlerProtocolGenerator, session uint64, toWorker chan *Message) *response {
 	response := &response{
-		session:     session,
-		fromHandler: make(chan *Message),
-		toWorker:    toWorker,
-		closed:      make(chan struct{}),
+		handlerProtocolGenerator: h,
+		session:                  session,
+		fromHandler:              make(chan *Message),
+		toWorker:                 toWorker,
+		closed:                   make(chan struct{}),
 	}
 
 	go loop(
@@ -119,7 +121,7 @@ func (r *response) Write(data []byte) {
 		return
 	}
 
-	r.fromHandler <- newChunk(r.session, data)
+	r.fromHandler <- r.newChunk(r.session, data)
 }
 
 // Notify a client about finishing the datastream.
@@ -128,7 +130,7 @@ func (r *response) Close() {
 		return
 	}
 
-	r.fromHandler <- newChoke(r.session)
+	r.fromHandler <- r.newChoke(r.session)
 	close(r.closed)
 }
 
@@ -138,7 +140,7 @@ func (r *response) ErrorMsg(code int, message string) {
 		return
 	}
 
-	r.fromHandler <- newError(
+	r.fromHandler <- r.newError(
 		// current session number
 		r.session,
 		// error code
