@@ -63,7 +63,7 @@ func (v *v0Protocol) newChunk(session uint64, data []byte) *Message {
 	return newChunkV0(session, data)
 }
 
-func (v *v0Protocol) newError(session uint64, code int, message string) *Message {
+func (v *v0Protocol) newError(session uint64, category, code int, message string) *Message {
 	return newErrorV0(session, code, message)
 }
 

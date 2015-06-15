@@ -27,7 +27,7 @@ type handlerProtocolGenerator interface {
 	messageTypeDetector
 	newChoke(session uint64) *Message
 	newChunk(session uint64, data []byte) *Message
-	newError(session uint64, code int, message string) *Message
+	newError(session uint64, category, code int, message string) *Message
 }
 
 type protocolDispather interface {

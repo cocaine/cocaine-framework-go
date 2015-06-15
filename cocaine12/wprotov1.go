@@ -86,8 +86,8 @@ func (v *v1Protocol) newChunk(session uint64, data []byte) *Message {
 	return newChunkV1(session, data)
 }
 
-func (v *v1Protocol) newError(session uint64, code int, message string) *Message {
-	return newErrorV1(session, code, message)
+func (v *v1Protocol) newError(session uint64, category, code int, message string) *Message {
+	return newErrorV1(session, category, code, message)
 }
 
 func newHandshakeV1(id string) *Message {
@@ -130,13 +130,13 @@ func newChunkV1(session uint64, data []byte) *Message {
 	}
 }
 
-func newErrorV1(session uint64, code int, message string) *Message {
+func newErrorV1(session uint64, category, code int, message string) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
 			MsgType: v1Error,
 		},
-		Payload: []interface{}{code, message},
+		Payload: []interface{}{[2]int{category, code}, message},
 	}
 }
 

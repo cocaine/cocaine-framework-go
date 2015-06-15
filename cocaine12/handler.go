@@ -13,6 +13,10 @@ type request struct {
 	closed     chan struct{}
 }
 
+const (
+	cworkererrorcategory = 42
+)
+
 var (
 	// ErrStreamIsClosed means that a response stream is closed
 	ErrStreamIsClosed = &ClosedError{}
@@ -150,6 +154,8 @@ func (r *response) ErrorMsg(code int, message string) {
 	r.fromHandler <- r.newError(
 		// current session number
 		r.session,
+		// category
+		cworkererrorcategory,
 		// error code
 		code,
 		// error message
