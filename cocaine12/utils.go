@@ -4,12 +4,17 @@ import (
 	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
 )
 
+var (
+	mPayloadHandler codec.MsgpackHandle
+	payloadHandler  = &mPayloadHandler
+)
+
 func convertPayload(in interface{}, out interface{}) error {
 	var buf []byte
-	if err := codec.NewEncoderBytes(&buf, h).Encode(in); err != nil {
+	if err := codec.NewEncoderBytes(&buf, payloadHandler).Encode(in); err != nil {
 		return err
 	}
-	if err := codec.NewDecoderBytes(buf, h).Decode(out); err != nil {
+	if err := codec.NewDecoderBytes(buf, payloadHandler).Decode(out); err != nil {
 		return err
 	}
 	return nil

@@ -2,10 +2,12 @@ package cocaine12
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
 type request struct {
+	messageTypeDetector
 	fromWorker chan *Message
 	toHandler  chan *Message
 	closed     chan struct{}
@@ -36,11 +38,12 @@ func IsTimeout(err error) bool {
 	return false
 }
 
-func newRequest() *request {
+func newRequest(mtd messageTypeDetector) *request {
 	request := &request{
-		fromWorker: make(chan *Message),
-		toHandler:  make(chan *Message),
-		closed:     make(chan struct{}),
+		messageTypeDetector: mtd,
+		fromWorker:          make(chan *Message),
+		toHandler:           make(chan *Message),
+		closed:              make(chan struct{}),
 	}
 
 	go loop(
@@ -69,10 +72,14 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 			return nil, ErrStreamIsClosed
 		}
 
-		if result, isByte := msg.Payload[0].([]byte); isByte {
-			return result, nil
+		if request.isChunk(msg) {
+			if result, isByte := msg.Payload[0].([]byte); isByte {
+				return result, nil
+			}
+			return nil, ErrBadPayload
+		} else {
+			return nil, fmt.Errorf("error %d: %s", msg.Payload...)
 		}
-		return nil, ErrBadPayload
 	case <-onTimeout:
 		return nil, ErrTimeout
 	}

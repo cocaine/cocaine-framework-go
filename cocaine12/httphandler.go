@@ -12,6 +12,11 @@ import (
 )
 
 var (
+	mh codec.MsgpackHandle
+	h  = &mh
+)
+
+var (
 	mhHTTPReq codec.MsgpackHandle
 	hHTTPReq  = &mhHTTPReq
 )

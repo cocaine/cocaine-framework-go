@@ -141,7 +141,16 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 		fallbackHandler: DefaultFallbackEventHandler,
 		debug:           debug,
 		protoVersion:    protoVersion,
-		dispatcher:      NewV0Protocol(),
+		dispatcher:      nil,
+	}
+
+	switch w.protoVersion {
+	case v0:
+		w.dispatcher = newV0Protocol()
+	case v1:
+		w.dispatcher = newV1Protocol()
+	default:
+		return nil, fmt.Errorf("unsupported protocol version %d", w.protoVersion)
 	}
 
 	// NewTimer launches timer
@@ -292,6 +301,12 @@ func (w *Worker) onChunk(msg *Message) {
 	}
 }
 
+func (w *Worker) onError(msg *Message) {
+	if reqStream, ok := w.sessions[msg.Session]; ok {
+		reqStream.push(msg)
+	}
+}
+
 func (w *Worker) onInvoke(msg *Message) {
 	var (
 		event          string
@@ -306,7 +321,7 @@ func (w *Worker) onInvoke(msg *Message) {
 
 	ctx := context.Background()
 	responseStream := newResponse(w.dispatcher, currentSession, w.fromHandlers)
-	requestStream := newRequest()
+	requestStream := newRequest(w.dispatcher)
 	w.sessions[currentSession] = requestStream
 
 	handler, ok := w.handlers[event]
