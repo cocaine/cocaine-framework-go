@@ -2,6 +2,12 @@
 
 all: deps fmt test
 
+GIT_VERSION := $(shell git describe --abbrev=8 --dirty --always)
+GO_LDFLAGS=-ldflags "-X `go list ./version`.Version $(GIT_VERSION)"
+
+bridge: deps
+	go build -o bridge $(GO_LDFLAGS) ./cmd/bridge_main.go
+
 
 deps:
 	go get -t ./cocaine12/...

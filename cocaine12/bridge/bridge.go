@@ -26,10 +26,11 @@ type Bridge struct {
 }
 
 type BridgeConfig struct {
-	Name string
-	Args []string
-	Env  []string
-	Port int
+	Name           string
+	Args           []string
+	Env            []string
+	Port           int
+	StartupTimeout int
 }
 
 func (cfg *BridgeConfig) Endpoint() string {
@@ -48,14 +49,13 @@ func filterEndpointArg(args []string) []string {
 	return args
 }
 
-func DefaultBridgeConfig() *BridgeConfig {
-	name := "slave"
-
+func NewBridgeConfig() *BridgeConfig {
 	cfg := &BridgeConfig{
-		Name: name,
-		Args: filterEndpointArg(os.Args[1:]),
-		Env:  os.Environ(),
-		Port: 8080,
+		Name:           "",
+		Args:           filterEndpointArg(os.Args[1:]),
+		Env:            os.Environ(),
+		Port:           8080,
+		StartupTimeout: 5,
 	}
 	return cfg
 }
@@ -145,7 +145,7 @@ func (b *Bridge) Start() error {
 	onClose := make(chan struct{})
 	defer close(onClose)
 	go func() {
-		deadline := time.After(5 * time.Second)
+		deadline := time.After(time.Duration(b.config.StartupTimeout) * time.Second)
 		endpoint := b.config.Endpoint()
 	PING_LOOP:
 		for {
