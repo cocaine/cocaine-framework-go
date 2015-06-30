@@ -14,6 +14,20 @@ type cocaineLogger struct {
 	severity Severity
 }
 
+type attrPair struct {
+	Name  string
+	Value interface{}
+}
+
+func formatFields(f Fields) []attrPair {
+	formatted := make([]attrPair, 0, len(f))
+	for k, v := range f {
+		formatted = append(formatted, attrPair{k, v})
+	}
+
+	return formatted
+}
+
 func newCocaineLogger(name string, endpoints ...string) (Logger, error) {
 	timeout := time.Second * 5
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -74,15 +88,6 @@ func (c *cocaineLogger) V(level Severity) bool {
 	return level >= c.severity.get()
 }
 
-func (c *cocaineLogger) formatFields(f Fields) []interface{} {
-	formatted := make([]interface{}, 0, len(f))
-	for k, v := range f {
-		formatted = append(formatted, []interface{}{k, v})
-	}
-
-	return formatted
-}
-
 func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 	return &Entry{
 		Logger: c,
@@ -93,16 +98,14 @@ func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
 	var methodArgs []interface{}
 	if len(args) > 0 {
-		methodArgs = []interface{}{level, defaultAppName, fmt.Sprintf(msg, args...), c.formatFields(fields)}
+		methodArgs = []interface{}{level, defaults.AppName, fmt.Sprintf(msg, args...), formatFields(fields)}
 	} else {
-		methodArgs = []interface{}{level, defaultAppName, msg, c.formatFields(fields)}
+		methodArgs = []interface{}{level, defaults.AppName, msg, formatFields(fields)}
 	}
-
-	i := c.Service.sessions.Next()
 
 	loggermsg := &Message{
 		CommonMessageInfo{
-			i,
+			c.Service.sessions.Next(),
 			loggerEmit},
 		methodArgs,
 	}

@@ -2,7 +2,6 @@ package cocaine12
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"runtime/debug"
 	"time"
@@ -101,24 +100,31 @@ type Worker struct {
 	fallbackHandler FallbackEventHandler
 	// if set recoverTrap sends Stack
 	debug bool
+	// protocol version id
+	protoVersion int
+	// protocol dispatcher
+	dispatcher protocolDispather
 }
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
 func NewWorker() (*Worker, error) {
-	setupFlags()
-	flag.Parse()
+	workerID := defaults.UUID
 
-	workerID := flagUUID
+	unixSocketEndpoint := defaults.Endpoint
+	if unixSocketEndpoint == "" {
+		return nil, fmt.Errorf("cocaine endpoint must be specified")
+	}
 
 	// Connect to cocaine-runtime over a unix socket
-	sock, err := newUnixConnection(flagEndpoint, coreConnectionTimeout)
+	sock, err := newUnixConnection(unixSocketEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return newWorker(sock, workerID)
+
+	return newWorker(sock, workerID, defaults.Protocol, defaults.Debug)
 }
 
-func newWorker(conn socketIO, id string) (*Worker, error) {
+func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
 	w := &Worker{
 		conn: conn,
 		id:   id,
@@ -133,7 +139,18 @@ func newWorker(conn socketIO, id string) (*Worker, error) {
 		stopped: make(chan struct{}),
 
 		fallbackHandler: DefaultFallbackEventHandler,
-		debug:           false,
+		debug:           debug,
+		protoVersion:    protoVersion,
+		dispatcher:      nil,
+	}
+
+	switch w.protoVersion {
+	case v0:
+		w.dispatcher = newV0Protocol()
+	case v1:
+		w.dispatcher = newV1Protocol()
+	default:
+		return nil, fmt.Errorf("unsupported protocol version %d", w.protoVersion)
 	}
 
 	// NewTimer launches timer
@@ -163,6 +180,7 @@ func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
 
 // call a fallback handler inwith a panic trap
 func (w *Worker) callFallbackHandler(ctx context.Context, event string, request Request, response Response) {
+	defer response.Close()
 	defer recoverTrap(ctx, event, response, w.debug)
 	w.fallbackHandler(ctx, event, request, response)
 }
@@ -206,23 +224,23 @@ func (w *Worker) loop() error {
 	var err error
 	// Send heartbeat to notify cocaine-runtime
 	// we are ready to work
-	w.onHeartbeat()
+	w.onHeartbeatTimeout()
 
 	for {
 		select {
 		case msg, ok := <-w.conn.Read():
 			if ok {
 				// otherwise the connection is closed
-				w.onMessage(msg)
+				w.dispatcher.onMessage(w, msg)
 			}
 
 		case <-w.heartbeatTimer.C:
 			// Reset (start) disown & heartbeat timers
 			// Send a heartbeat message to cocaine-runtime
-			w.onHeartbeat()
+			w.onHeartbeatTimeout()
 
 		case <-w.disownTimer.C:
-			w.onDisown()
+			w.onDisownTimeout()
 			err = ErrDisowned
 
 		// ToDo: reply directly to a connection
@@ -240,88 +258,15 @@ func (w *Worker) loop() error {
 	}
 }
 
-func (w *Worker) onMessage(msg *Message) {
-	switch msg.MsgType {
-	case chunkType:
-		if reqStream, ok := w.sessions[msg.Session]; ok {
-			reqStream.push(msg)
-		}
-
-	case chokeType:
-		if reqStream, ok := w.sessions[msg.Session]; ok {
-			reqStream.Close()
-			delete(w.sessions, msg.Session)
-		}
-
-	case invokeType:
-		var (
-			event          string
-			currentSession = msg.Session
-		)
-
-		event, ok := getEventName(msg)
-		if !ok {
-			// corrupted message
-			return
-		}
-
-		ctx := context.Background()
-		responseStream := newResponse(currentSession, w.fromHandlers)
-		requestStream := newRequest()
-		w.sessions[currentSession] = requestStream
-
-		handler, ok := w.handlers[event]
-		if !ok {
-			go w.callFallbackHandler(ctx, event, requestStream, responseStream)
-			return
-		}
-
-		go func() {
-			defer recoverTrap(ctx, event, responseStream, w.debug)
-
-			handler(ctx, requestStream, responseStream)
-		}()
-
-	case heartbeatType:
-		// Reply to heartbeat has been received,
-		// so we are not disowned & disownTimer must be stopped
-		// It will be launched when a next heartbeat is sent
-		w.disownTimer.Stop()
-
-	case terminateType:
-		// According to spec we have time
-		// to prepare for being killed by cocaine-runtime
-		w.onTerminate()
-
-	default:
-		// Invalid message
-		fmt.Printf("invalid message type: %d, message %v", msg.MsgType, msg)
-	}
-}
-
 // A reply to heartbeat is not arrived during disownTimeout,
 // so it seems cocaine-runtime has died
-func (w *Worker) onDisown() {
+func (w *Worker) onDisownTimeout() {
 	w.Stop()
 }
 
-func (w *Worker) onTerminate() {
-	w.Stop()
-}
-
-// Send handshake message to cocaine-runtime
-// It is needed to be called only once on a startup
-// to notify runtime that we have started
-func (w *Worker) sendHandshake() {
+func (w *Worker) onHeartbeatTimeout() {
 	select {
-	case w.conn.Write() <- newHandshake(w.id):
-	case <-w.conn.IsClosed():
-	}
-}
-
-func (w *Worker) onHeartbeat() {
-	select {
-	case w.conn.Write() <- newHeartbeatMessage():
+	case w.conn.Write() <- w.dispatcher.newHeartbeat():
 	case <-w.conn.IsClosed():
 	}
 
@@ -329,4 +274,79 @@ func (w *Worker) onHeartbeat() {
 	w.disownTimer.Reset(disownTimeout)
 	// Send next heartbeat over heartbeatTimeout
 	w.heartbeatTimer.Reset(heartbeatTimeout)
+}
+
+// Send handshake message to cocaine-runtime
+// It is needed to be called only once on a startup
+// to notify runtime that we have started
+func (w *Worker) sendHandshake() {
+	select {
+	case w.conn.Write() <- w.dispatcher.newHandshake(w.id):
+	case <-w.conn.IsClosed():
+	}
+}
+
+// Message handlers
+
+func (w *Worker) onChoke(msg *Message) {
+	if reqStream, ok := w.sessions[msg.Session]; ok {
+		reqStream.Close()
+		delete(w.sessions, msg.Session)
+	}
+}
+
+func (w *Worker) onChunk(msg *Message) {
+	if reqStream, ok := w.sessions[msg.Session]; ok {
+		reqStream.push(msg)
+	}
+}
+
+func (w *Worker) onError(msg *Message) {
+	if reqStream, ok := w.sessions[msg.Session]; ok {
+		reqStream.push(msg)
+	}
+}
+
+func (w *Worker) onInvoke(msg *Message) {
+	var (
+		event          string
+		currentSession = msg.Session
+	)
+
+	event, ok := getEventName(msg)
+	if !ok {
+		// corrupted message
+		return
+	}
+
+	ctx := context.Background()
+	responseStream := newResponse(w.dispatcher, currentSession, w.fromHandlers)
+	requestStream := newRequest(w.dispatcher)
+	w.sessions[currentSession] = requestStream
+
+	handler, ok := w.handlers[event]
+	if !ok {
+		go w.callFallbackHandler(ctx, event, requestStream, responseStream)
+		return
+	}
+
+	go func() {
+		defer responseStream.Close()
+		defer recoverTrap(ctx, event, responseStream, w.debug)
+
+		handler(ctx, requestStream, responseStream)
+	}()
+}
+
+func (w *Worker) onHeartbeat(msg *Message) {
+	// Reply to a heartbeat has been received,
+	// so we are not disowned & disownTimer must be stopped
+	// It will be launched when the next heartbeat is sent
+	w.disownTimer.Stop()
+}
+
+func (w *Worker) onTerminate(msg *Message) {
+	// According to spec we have time
+	// to prepare for being killed by cocaine-runtime
+	w.Stop()
 }

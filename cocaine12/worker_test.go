@@ -54,7 +54,7 @@ func TestWorker(t *testing.T) {
 	in, out := testConn()
 	sock, _ := newAsyncRW(out)
 	sock2, _ := newAsyncRW(in)
-	w, err := newWorker(sock, testID)
+	w, err := newWorker(sock, testID, 0, true)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
@@ -88,29 +88,29 @@ func TestWorker(t *testing.T) {
 		close(onStop)
 	}()
 
-	corrupted := newInvoke(testSession+100, "AAA")
+	corrupted := newInvokeV0(testSession+100, "AAA")
 	corrupted.Payload = []interface{}{nil}
 	sock2.Write() <- corrupted
 
-	sock2.Write() <- newInvoke(testSession, "test")
-	sock2.Write() <- newChunk(testSession, []byte("Dummy"))
-	sock2.Write() <- newChoke(testSession)
+	sock2.Write() <- newInvokeV0(testSession, "test")
+	sock2.Write() <- newChunkV0(testSession, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession)
 
-	sock2.Write() <- newInvoke(testSession+1, "http")
-	sock2.Write() <- newChunk(testSession+1, packTestReq(req))
-	sock2.Write() <- newChoke(testSession + 1)
+	sock2.Write() <- newInvokeV0(testSession+1, "http")
+	sock2.Write() <- newChunkV0(testSession+1, packTestReq(req))
+	sock2.Write() <- newChokeV0(testSession + 1)
 
-	sock2.Write() <- newInvoke(testSession+2, "error")
-	sock2.Write() <- newChunk(testSession+2, []byte("Dummy"))
-	sock2.Write() <- newChoke(testSession + 2)
+	sock2.Write() <- newInvokeV0(testSession+2, "error")
+	sock2.Write() <- newChunkV0(testSession+2, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 2)
 
-	sock2.Write() <- newInvoke(testSession+3, "BadEvent")
-	sock2.Write() <- newChunk(testSession+3, []byte("Dummy"))
-	sock2.Write() <- newChoke(testSession + 3)
+	sock2.Write() <- newInvokeV0(testSession+3, "BadEvent")
+	sock2.Write() <- newChunkV0(testSession+3, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 3)
 
-	sock2.Write() <- newInvoke(testSession+4, "panic")
-	sock2.Write() <- newChunk(testSession+4, []byte("Dummy"))
-	sock2.Write() <- newChoke(testSession + 4)
+	sock2.Write() <- newInvokeV0(testSession+4, "panic")
+	sock2.Write() <- newChunkV0(testSession+4, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 4)
 
 	// handshake
 	eHandshake := <-sock2.Read()
@@ -188,7 +188,7 @@ func TestWorkerTermination(t *testing.T) {
 	in, out := testConn()
 	sock, _ := newAsyncRW(out)
 	sock2, _ := newAsyncRW(in)
-	w, err := newWorker(sock, testID)
+	w, err := newWorker(sock, testID, 0, true)
 	if err != nil {
 		t.Fatal("unable to create worker", err)
 	}
@@ -203,7 +203,7 @@ func TestWorkerTermination(t *testing.T) {
 	eHeartbeat := <-sock2.Read()
 	checkTypeAndSession(t, eHeartbeat, 0, heartbeatType)
 
-	sock2.Write() <- newHeartbeatMessage()
+	sock2.Write() <- newHeartbeatV0()
 
 	terminate := &Message{
 		CommonMessageInfo: CommonMessageInfo{

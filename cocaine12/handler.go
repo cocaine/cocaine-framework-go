@@ -2,14 +2,20 @@ package cocaine12
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
 type request struct {
+	messageTypeDetector
 	fromWorker chan *Message
 	toHandler  chan *Message
 	closed     chan struct{}
 }
+
+const (
+	cworkererrorcategory = 42
+)
 
 var (
 	// ErrStreamIsClosed means that a response stream is closed
@@ -36,11 +42,12 @@ func IsTimeout(err error) bool {
 	return false
 }
 
-func newRequest() *request {
+func newRequest(mtd messageTypeDetector) *request {
 	request := &request{
-		fromWorker: make(chan *Message),
-		toHandler:  make(chan *Message),
-		closed:     make(chan struct{}),
+		messageTypeDetector: mtd,
+		fromWorker:          make(chan *Message),
+		toHandler:           make(chan *Message),
+		closed:              make(chan struct{}),
 	}
 
 	go loop(
@@ -69,10 +76,14 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 			return nil, ErrStreamIsClosed
 		}
 
-		if result, isByte := msg.Payload[0].([]byte); isByte {
-			return result, nil
+		if request.isChunk(msg) {
+			if result, isByte := msg.Payload[0].([]byte); isByte {
+				return result, nil
+			}
+			return nil, ErrBadPayload
+		} else {
+			return nil, fmt.Errorf("error %d: %s", msg.Payload...)
 		}
-		return nil, ErrBadPayload
 	case <-onTimeout:
 		return nil, ErrTimeout
 	}
@@ -87,18 +98,20 @@ func (request *request) Close() {
 }
 
 type response struct {
+	handlerProtocolGenerator
 	session     uint64
 	fromHandler chan *Message
 	toWorker    chan *Message
 	closed      chan struct{}
 }
 
-func newResponse(session uint64, toWorker chan *Message) *response {
+func newResponse(h handlerProtocolGenerator, session uint64, toWorker chan *Message) *response {
 	response := &response{
-		session:     session,
-		fromHandler: make(chan *Message),
-		toWorker:    toWorker,
-		closed:      make(chan struct{}),
+		handlerProtocolGenerator: h,
+		session:                  session,
+		fromHandler:              make(chan *Message),
+		toWorker:                 toWorker,
+		closed:                   make(chan struct{}),
 	}
 
 	go loop(
@@ -119,7 +132,7 @@ func (r *response) Write(data []byte) {
 		return
 	}
 
-	r.fromHandler <- newChunk(r.session, data)
+	r.fromHandler <- r.newChunk(r.session, data)
 }
 
 // Notify a client about finishing the datastream.
@@ -128,7 +141,7 @@ func (r *response) Close() {
 		return
 	}
 
-	r.fromHandler <- newChoke(r.session)
+	r.fromHandler <- r.newChoke(r.session)
 	close(r.closed)
 }
 
@@ -138,9 +151,11 @@ func (r *response) ErrorMsg(code int, message string) {
 		return
 	}
 
-	r.fromHandler <- newError(
+	r.fromHandler <- r.newError(
 		// current session number
 		r.session,
+		// category
+		cworkererrorcategory,
 		// error code
 		code,
 		// error message
