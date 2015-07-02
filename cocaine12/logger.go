@@ -26,7 +26,7 @@ type Logger interface {
 	WithFields(Fields) *Entry
 
 	Verbosity() Severity
-	SetVerbosity(level Severity)
+	// SetVerbosity(level Severity)
 	V(level Severity) bool
 
 	Close()

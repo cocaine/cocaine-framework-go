@@ -10,6 +10,10 @@ type Message struct {
 	Payload []interface{}
 }
 
+func (m *Message) String() string {
+	return fmt.Sprintf("message %v %v payload %v", m.MsgType, m.Session, m.Payload)
+}
+
 type CommonMessageInfo struct {
 	// Session id
 	Session uint64

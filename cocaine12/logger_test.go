@@ -10,7 +10,7 @@ func TestLogger(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	log.SetVerbosity(InfoLevel)
+	// log.SetVerbosity(InfoLevel)
 	log.WithFields(Fields{"a": 1, "b": 2}).Errf("test %v", log.Verbosity())
 	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("test %v", log.Verbosity())
 	log.WithFields(Fields{"a": 1, "b": 2}).Infof("test %v", log.Verbosity())

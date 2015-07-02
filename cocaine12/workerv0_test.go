@@ -37,11 +37,11 @@ func checkTypeAndSession(t *testing.T, msg *Message, eSession uint64, eType uint
 		t.Fatalf("%d expected, but got %d", eType, msg.MsgType)
 	}
 	if msg.Session != eSession {
-		t.Fatal("Bad session number: %d instead of %d", msg.Session, eSession)
+		t.Fatalf("Bad session number: %d instead of %d", msg.Session, eSession)
 	}
 }
 
-func TestWorker(t *testing.T) {
+func TestWorkerV0(t *testing.T) {
 	const (
 		testID      = "uuid"
 		testSession = 10
@@ -178,7 +178,7 @@ func TestWorker(t *testing.T) {
 	w.Stop()
 }
 
-func TestWorkerTermination(t *testing.T) {
+func TestWorkerV0Termination(t *testing.T) {
 	const (
 		testID = "uuid"
 	)

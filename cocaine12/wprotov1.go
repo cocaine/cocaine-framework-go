@@ -35,8 +35,8 @@ func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) {
 	if v.maxSession < msg.Session {
 		// It must be Invkoke
 		if msg.MsgType != v1Invoke {
-			fmt.Printf("new session %d must start from invoke type %d",
-				msg.Session, msg.MsgType)
+			fmt.Printf("new session %d must start from invoke type %d, not %d\n",
+				msg.Session, v1Invoke, msg.MsgType)
 			return
 		}
 
@@ -114,7 +114,7 @@ func newInvokeV1(session uint64, event string) *Message {
 	return &Message{
 		CommonMessageInfo: CommonMessageInfo{
 			Session: session,
-			MsgType: invokeType,
+			MsgType: v1Invoke,
 		},
 		Payload: []interface{}{event},
 	}
