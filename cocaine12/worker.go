@@ -60,7 +60,7 @@ func DefaultFallbackEventHandler(ctx context.Context, event string, request Requ
 	response.ErrorMsg(ErrorNoEventHandler, errMsg)
 }
 
-func recoverTrap(ctx context.Context, event string, response Response, printStack bool) {
+func trapRecoverAndClose(ctx context.Context, event string, response Response, printStack bool) {
 	if recoverInfo := recover(); recoverInfo != nil {
 		var stack []byte
 
@@ -72,7 +72,10 @@ func recoverTrap(ctx context.Context, event string, response Response, printStac
 			ErrorPanicInHandler,
 			fmt.Sprintf("Event: '%s', recover: %s, stack: %s", event, recoverInfo, stack),
 		)
+		return
 	}
+
+	response.Close()
 }
 
 // Worker performs IO operations between an application
@@ -180,8 +183,7 @@ func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
 
 // call a fallback handler inwith a panic trap
 func (w *Worker) callFallbackHandler(ctx context.Context, event string, request Request, response Response) {
-	defer response.Close()
-	defer recoverTrap(ctx, event, response, w.debug)
+	defer trapRecoverAndClose(ctx, event, response, w.debug)
 	w.fallbackHandler(ctx, event, request, response)
 }
 
@@ -331,8 +333,9 @@ func (w *Worker) onInvoke(msg *Message) {
 	}
 
 	go func() {
-		defer responseStream.Close()
-		defer recoverTrap(ctx, event, responseStream, w.debug)
+		// this trap catches a panic from a handler
+		// and checks if the response is closed.
+		defer trapRecoverAndClose(ctx, event, responseStream, w.debug)
 
 		handler(ctx, requestStream, responseStream)
 	}()
