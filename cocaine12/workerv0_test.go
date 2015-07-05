@@ -141,6 +141,7 @@ func TestWorkerV0(t *testing.T) {
 
 	// http event
 	// status code & headers
+	t.Log("HTTP test:")
 	eChunk = <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
 	var firstChunk struct {
@@ -151,25 +152,29 @@ func TestWorkerV0(t *testing.T) {
 	assert.Equal(t, http.StatusProxyAuthRequired, firstChunk.Status, "http: invalid status code")
 	assert.Equal(t, [][2]string{[2]string{"X-Test", "Test"}}, firstChunk.Headers, "http: headers")
 	// body
+	t.Log("Body check")
 	eChunk = <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
-	assert.Equal(t, eChunk.Payload[0].([]byte), []byte("OK"), "http: invalid body")
+	assert.Equal(t, eChunk.Payload[0].([]byte), []byte("OK"), "http: invalid body %s", eChunk.Payload[0])
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+1, chokeType)
 
 	// error event
+	t.Log("error event")
 	eError := <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+2, errorType)
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+2, chokeType)
 
 	// badevent
+	t.Log("badevent event")
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+3, errorType)
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+3, chokeType)
 
 	// panic
+	t.Log("panic event")
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+4, errorType)
 	eChoke = <-sock2.Read()
