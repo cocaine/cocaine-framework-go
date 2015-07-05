@@ -3,6 +3,8 @@ package cocaine12
 import (
 	"errors"
 	"fmt"
+	"io"
+	"syscall"
 	"time"
 )
 
@@ -127,22 +129,25 @@ func newResponse(h handlerProtocolGenerator, session uint64, toWorker chan *Mess
 }
 
 // Sends chunk of data to a client.
-func (r *response) Write(data []byte) {
+func (r *response) Write(data []byte) (n int, err error) {
 	if r.isClosed() {
-		return
+		return 0, io.ErrClosedPipe
 	}
 
 	r.fromHandler <- r.newChunk(r.session, data)
+	return len(data), nil
 }
 
 // Notify a client about finishing the datastream.
-func (r *response) Close() {
+func (r *response) Close() error {
 	if r.isClosed() {
-		return
+		// we treat it as a network connection
+		return syscall.EINVAL
 	}
 
 	r.fromHandler <- r.newChoke(r.session)
 	close(r.closed)
+	return nil
 }
 
 // Send error to a client. Specify code and message, which describes this error.

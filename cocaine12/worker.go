@@ -3,6 +3,7 @@ package cocaine12
 import (
 	"errors"
 	"fmt"
+	"io"
 	"runtime/debug"
 	"time"
 
@@ -38,9 +39,8 @@ type Request interface {
 
 // ResponseStream provides an interface for a handler to reply
 type ResponseStream interface {
-	Write(data []byte)
+	io.WriteCloser
 	ErrorMsg(code int, message string)
-	Close()
 }
 
 // Response provides an interface for a handler to reply
