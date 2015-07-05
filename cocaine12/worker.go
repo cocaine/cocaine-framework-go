@@ -40,7 +40,7 @@ type Request interface {
 // ResponseStream provides an interface for a handler to reply
 type ResponseStream interface {
 	io.WriteCloser
-	ErrorMsg(code int, message string)
+	ErrorMsg(code int, message string) error
 }
 
 // Response provides an interface for a handler to reply

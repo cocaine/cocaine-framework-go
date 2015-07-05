@@ -151,9 +151,9 @@ func (r *response) Close() error {
 }
 
 // Send error to a client. Specify code and message, which describes this error.
-func (r *response) ErrorMsg(code int, message string) {
+func (r *response) ErrorMsg(code int, message string) error {
 	if r.isClosed() {
-		return
+		return io.ErrClosedPipe
 	}
 
 	r.fromHandler <- r.newError(
@@ -168,6 +168,7 @@ func (r *response) ErrorMsg(code int, message string) {
 	)
 
 	r.Close()
+	return nil
 }
 
 func (r *response) isClosed() bool {
