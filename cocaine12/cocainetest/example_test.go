@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func ExampleMock() {
+func Example() {
 	var handler cocaine.EventHandler // check type
 
 	handler = func(ctx context.Context, req cocaine.Request, resp cocaine.Response) {
