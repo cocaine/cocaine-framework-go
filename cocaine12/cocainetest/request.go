@@ -25,12 +25,11 @@ func (r *Request) Push(chunk []byte) {
 	r.chunks = append(r.chunks, chunk)
 }
 
-func (r *Request) Read(timeout ...time.Duration) ([]byte, error) {
+func (r *Request) Read(timeout ...time.Duration) (chunk []byte, err error) {
 	if len(r.chunks) == 0 {
 		return nil, ErrNoChunks
 	}
 
-	chunk := r.chunks[0]
-	r.chunks = r.chunks[1:]
-	return chunk, nil
+	chunk, r.chunks = r.chunks[0], r.chunks[1:]
+	return
 }
