@@ -152,10 +152,9 @@ func TestWorkerV0(t *testing.T) {
 	assert.Equal(t, http.StatusProxyAuthRequired, firstChunk.Status, "http: invalid status code")
 	assert.Equal(t, [][2]string{[2]string{"X-Test", "Test"}}, firstChunk.Headers, "http: headers")
 	// body
-	t.Log("Body check")
 	eChunk = <-sock2.Read()
 	checkTypeAndSession(t, eChunk, testSession+1, chunkType)
-	assert.Equal(t, eChunk.Payload[0].([]byte), []byte("OK"), "http: invalid body %s", eChunk.Payload[0])
+	assert.Equal(t, []byte("OK"), eChunk.Payload[0].([]byte), "http: invalid body %s", eChunk.Payload[0])
 	eChoke = <-sock2.Read()
 	checkTypeAndSession(t, eChoke, testSession+1, chokeType)
 

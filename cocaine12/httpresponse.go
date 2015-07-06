@@ -70,6 +70,7 @@ func (w *ResponseWriter) bodyAllowed() bool {
 
 // Write writes the data to the connection as part of an HTTP reply
 func (w *ResponseWriter) Write(data []byte) (n int, err error) {
+	// fmt.Printf("%s\n", data)
 	return w.write(len(data), data)
 }
 
