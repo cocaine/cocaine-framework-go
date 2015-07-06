@@ -6,7 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func Example_applicationClient() {
+func Example_ApplicationClient() {
 	ctx := context.Background()
 	s, err := NewService(ctx, "log", nil)
 	if err != nil {
@@ -23,6 +23,7 @@ func Example_applicationClient() {
 	if err := channel.Call("write", "AAAAAA"); err != nil {
 		log.Fatal(err)
 	}
+	defer channel.Call("close")
 
 	// receive the answer from the application
 	answer, err := channel.Get()
