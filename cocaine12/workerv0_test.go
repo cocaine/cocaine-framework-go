@@ -34,7 +34,7 @@ func testConn() (io.ReadWriteCloser, io.ReadWriteCloser) {
 
 func checkTypeAndSession(t *testing.T, msg *Message, eSession uint64, eType uint64) {
 	if msg.MsgType != eType {
-		t.Fatalf("%d expected, but got %d", eType, msg.MsgType)
+		t.Fatalf("%d expected, but got %d: %v", eType, msg.MsgType, msg)
 	}
 	if msg.Session != eSession {
 		t.Fatalf("Bad session number: %d instead of %d", msg.Session, eSession)
