@@ -12,6 +12,7 @@ const loggerEmit = 0
 type cocaineLogger struct {
 	*Service
 	severity Severity
+	prefix   string
 }
 
 type attrPair struct {
@@ -41,6 +42,7 @@ func newCocaineLogger(name string, endpoints ...string) (Logger, error) {
 	logger := &cocaineLogger{
 		Service:  service,
 		severity: -100,
+		prefix:   fmt.Sprintf("app/%s", defaults.AppName),
 	}
 	return logger, nil
 }
@@ -98,9 +100,9 @@ func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
 	var methodArgs []interface{}
 	if len(args) > 0 {
-		methodArgs = []interface{}{level, defaults.AppName, fmt.Sprintf(msg, args...), formatFields(fields)}
+		methodArgs = []interface{}{level, c.prefix, fmt.Sprintf(msg, args...), formatFields(fields)}
 	} else {
-		methodArgs = []interface{}{level, defaults.AppName, msg, formatFields(fields)}
+		methodArgs = []interface{}{level, c.prefix, msg, formatFields(fields)}
 	}
 
 	loggermsg := &Message{
