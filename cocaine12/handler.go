@@ -101,29 +101,18 @@ func (request *request) Close() {
 
 type response struct {
 	handlerProtocolGenerator
-	session     uint64
-	fromHandler chan *Message
-	toWorker    chan *Message
-	closed      chan struct{}
+	session  uint64
+	toWorker asyncSender
+	closed   bool
 }
 
-func newResponse(h handlerProtocolGenerator, session uint64, toWorker chan *Message) *response {
+func newResponse(h handlerProtocolGenerator, session uint64, toWorker asyncSender) *response {
 	response := &response{
 		handlerProtocolGenerator: h,
 		session:                  session,
-		fromHandler:              make(chan *Message),
 		toWorker:                 toWorker,
-		closed:                   make(chan struct{}),
+		closed:                   false,
 	}
-
-	go loop(
-		// input
-		response.fromHandler,
-		// output
-		response.toWorker,
-		// onclose
-		response.closed,
-	)
 
 	return response
 }
@@ -134,7 +123,7 @@ func (r *response) Write(data []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	r.fromHandler <- r.newChunk(r.session, data)
+	r.toWorker.Send(r.newChunk(r.session, data))
 	return len(data), nil
 }
 
@@ -145,8 +134,8 @@ func (r *response) Close() error {
 		return syscall.EINVAL
 	}
 
-	r.fromHandler <- r.newChoke(r.session)
-	close(r.closed)
+	r.closed = true
+	r.toWorker.Send(r.newChoke(r.session))
 	return nil
 }
 
@@ -156,7 +145,7 @@ func (r *response) ErrorMsg(code int, message string) error {
 		return io.ErrClosedPipe
 	}
 
-	r.fromHandler <- r.newError(
+	r.toWorker.Send(r.newError(
 		// current session number
 		r.session,
 		// category
@@ -165,19 +154,13 @@ func (r *response) ErrorMsg(code int, message string) error {
 		code,
 		// error message
 		message,
-	)
+	))
 
-	r.Close()
-	return nil
+	return r.Close()
 }
 
 func (r *response) isClosed() bool {
-	select {
-	case <-r.closed:
-		return true
-	default:
-	}
-	return false
+	return r.closed
 }
 
 func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {

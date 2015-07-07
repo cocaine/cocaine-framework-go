@@ -20,7 +20,12 @@ var (
 	hAsocket = &mhAsocket
 )
 
+type asyncSender interface {
+	Send(*Message)
+}
+
 type socketIO interface {
+	asyncSender
 	Read() chan *Message
 	Write() chan *Message
 	IsClosed() <-chan struct{}
@@ -217,6 +222,15 @@ func (sock *asyncRWSocket) Write() chan *Message {
 
 func (sock *asyncRWSocket) Read() chan *Message {
 	return sock.downstreamBuf.out
+}
+
+func (sock *asyncRWSocket) Send(msg *Message) {
+	select {
+	case sock.Write() <- msg:
+	case <-sock.IsClosed():
+		// Socket is in a closed state,
+		// so drop the data
+	}
 }
 
 func (sock *asyncRWSocket) writeloop() {
