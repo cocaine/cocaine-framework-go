@@ -1,9 +1,22 @@
 package cocaine12
 
+import (
+	"fmt"
+)
+
 const (
 	v0 = 0
 	v1 = 1
 )
+
+type ErrRequest struct {
+	Message        string
+	Category, Code int
+}
+
+func (e *ErrRequest) Error() string {
+	return fmt.Sprintf("[%d] [%d] %s", e.Category, e.Code, e.Message)
+}
 
 type messageTypeDetector interface {
 	isChunk(msg *Message) bool

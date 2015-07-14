@@ -2,7 +2,6 @@ package cocaine12
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"syscall"
 	"time"
@@ -17,6 +16,7 @@ type request struct {
 
 const (
 	cworkererrorcategory = 42
+	cdefaulterrrorcode   = 100
 )
 
 var (
@@ -26,6 +26,12 @@ var (
 	ErrTimeout = &TimeoutError{}
 	// ErrBadPayload means that a message payload is malformed
 	ErrBadPayload = errors.New("payload is not []byte")
+	// ErrMalformedErrorMessage
+	ErrMalformedErrorMessage = &ErrRequest{
+		Message:  "malformed error message",
+		Category: cworkererrorcategory,
+		Code:     cdefaulterrrorcode,
+	}
 )
 
 type TimeoutError struct{}
@@ -73,6 +79,9 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 	}
 
 	select {
+	// Choke never reaches this select,
+	// as it is simulated by closing toHandler channel.
+	// So msg can be either Chunk or Error.
 	case msg, ok := <-request.toHandler:
 		if !ok {
 			return nil, ErrStreamIsClosed
@@ -83,9 +92,37 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 				return result, nil
 			}
 			return nil, ErrBadPayload
-		} else {
-			return nil, fmt.Errorf("error %d: %s", msg.Payload...)
 		}
+
+		// return nil, fmt.Errorf("error %s", msg.Payload)
+		// Error message
+		err := &ErrRequest{}
+		if len(msg.Payload) == 0 {
+			return nil, ErrMalformedErrorMessage
+		}
+
+		switch msg.Payload[0].(type) {
+		case int, uint, int64:
+			var perr struct {
+				Code    int
+				Message string
+			}
+			convertPayload(msg.Payload, &perr)
+			err.Message = perr.Message
+			err.Code = perr.Code
+
+		default:
+			var perr struct {
+				CodeInfo [2]int
+				Message  string
+			}
+
+			convertPayload(msg.Payload, &perr)
+			err.Message = perr.Message
+			err.Category, err.Code = perr.CodeInfo[0], perr.CodeInfo[1]
+		}
+
+		return nil, err
 	case <-onTimeout:
 		return nil, ErrTimeout
 	}
@@ -164,6 +201,8 @@ func (r *response) isClosed() bool {
 }
 
 func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
+	defer close(output)
+
 	var (
 		pending []*Message
 		closed  = onclose
