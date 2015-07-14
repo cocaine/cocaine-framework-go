@@ -19,14 +19,14 @@ func Example() {
 	}
 
 	mockRequest := NewRequest()
-	mockRequest.Push([]byte("PING"))
+	mockRequest.Write([]byte("PING"))
 
 	mockResponse := NewResponse()
 
 	handler(context.Background(), mockRequest, mockResponse)
 
 	fmt.Printf("data: %s error: %d %s \n",
-		[]byte("PING"), mockResponse.Err.Code, mockResponse.Err.Msg)
+		mockResponse.Bytes(), mockResponse.Err.Code, mockResponse.Err.Msg)
 
 	// Output: data: PING error: 100 testerrormessage
 }
