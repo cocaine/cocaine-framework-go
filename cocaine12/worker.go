@@ -91,10 +91,6 @@ type Worker struct {
 	disownTimer *time.Timer
 	// Map handlers to sessions
 	sessions map[uint64]requestStream
-	// Channel for replying from handlers
-	// Everything is piped to cocaine without changes
-	// ResponseStream is responsible to format proper message
-	fromHandlers chan *Message
 	// handlers
 	handlers map[string]EventHandler
 	// Notify Run about stop
@@ -135,9 +131,8 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
 
-		sessions:     make(map[uint64]requestStream),
-		fromHandlers: make(chan *Message),
-		handlers:     make(map[string]EventHandler),
+		sessions: make(map[uint64]requestStream),
+		handlers: make(map[string]EventHandler),
 
 		stopped: make(chan struct{}),
 
@@ -245,13 +240,6 @@ func (w *Worker) loop() error {
 			w.onDisownTimeout()
 			err = ErrDisowned
 
-		// ToDo: reply directly to a connection
-		case outcoming := <-w.fromHandlers:
-			select {
-			case w.conn.Write() <- outcoming:
-			// Socket is in closed state, so drop data
-			case <-w.conn.IsClosed():
-			}
 		case <-w.stopped:
 			// If worker is disowned
 			// err is set to ErrDisowned
@@ -322,7 +310,7 @@ func (w *Worker) onInvoke(msg *Message) {
 	}
 
 	ctx := context.Background()
-	responseStream := newResponse(w.dispatcher, currentSession, w.fromHandlers)
+	responseStream := newResponse(w.dispatcher, currentSession, w.conn)
 	requestStream := newRequest(w.dispatcher)
 	w.sessions[currentSession] = requestStream
 

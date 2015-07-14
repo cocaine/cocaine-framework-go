@@ -96,22 +96,6 @@ func TestWorkerV0(t *testing.T) {
 	sock2.Write() <- newChunkV0(testSession, []byte("Dummy"))
 	sock2.Write() <- newChokeV0(testSession)
 
-	sock2.Write() <- newInvokeV0(testSession+1, "http")
-	sock2.Write() <- newChunkV0(testSession+1, packTestReq(req))
-	sock2.Write() <- newChokeV0(testSession + 1)
-
-	sock2.Write() <- newInvokeV0(testSession+2, "error")
-	sock2.Write() <- newChunkV0(testSession+2, []byte("Dummy"))
-	sock2.Write() <- newChokeV0(testSession + 2)
-
-	sock2.Write() <- newInvokeV0(testSession+3, "BadEvent")
-	sock2.Write() <- newChunkV0(testSession+3, []byte("Dummy"))
-	sock2.Write() <- newChokeV0(testSession + 3)
-
-	sock2.Write() <- newInvokeV0(testSession+4, "panic")
-	sock2.Write() <- newChunkV0(testSession+4, []byte("Dummy"))
-	sock2.Write() <- newChokeV0(testSession + 4)
-
 	// handshake
 	eHandshake := <-sock2.Read()
 	checkTypeAndSession(t, eHandshake, 0, handshakeType)
@@ -140,6 +124,9 @@ func TestWorkerV0(t *testing.T) {
 	checkTypeAndSession(t, eChoke, testSession, chokeType)
 
 	// http event
+	sock2.Write() <- newInvokeV0(testSession+1, "http")
+	sock2.Write() <- newChunkV0(testSession+1, packTestReq(req))
+	sock2.Write() <- newChokeV0(testSession + 1)
 	// status code & headers
 	t.Log("HTTP test:")
 	eChunk = <-sock2.Read()
@@ -160,6 +147,10 @@ func TestWorkerV0(t *testing.T) {
 
 	// error event
 	t.Log("error event")
+	sock2.Write() <- newInvokeV0(testSession+2, "error")
+	sock2.Write() <- newChunkV0(testSession+2, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 2)
+
 	eError := <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+2, errorType)
 	eChoke = <-sock2.Read()
@@ -167,6 +158,10 @@ func TestWorkerV0(t *testing.T) {
 
 	// badevent
 	t.Log("badevent event")
+	sock2.Write() <- newInvokeV0(testSession+3, "BadEvent")
+	sock2.Write() <- newChunkV0(testSession+3, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 3)
+
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+3, errorType)
 	eChoke = <-sock2.Read()
@@ -174,6 +169,10 @@ func TestWorkerV0(t *testing.T) {
 
 	// panic
 	t.Log("panic event")
+	sock2.Write() <- newInvokeV0(testSession+4, "panic")
+	sock2.Write() <- newChunkV0(testSession+4, []byte("Dummy"))
+	sock2.Write() <- newChokeV0(testSession + 4)
+
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+4, errorType)
 	eChoke = <-sock2.Read()
