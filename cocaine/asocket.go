@@ -88,7 +88,12 @@ type asyncRWSocket struct {
 }
 
 func newAsyncRWSocket(family string, address string, timeout time.Duration) (*asyncRWSocket, error) {
-	conn, err := net.DialTimeout(family, address, timeout)
+	dialer := net.Dialer{
+		Timeout:   timeout,
+		DualStack: true,
+	}
+
+	conn, err := dialer.Dial(family, address)
 	if err != nil {
 		return nil, err
 	}
