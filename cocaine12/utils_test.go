@@ -37,7 +37,6 @@ func TestRequestReaderEOF(t *testing.T) {
 	}
 
 	err := dec.Decode(&actual)
-	t.Logf("%s", err)
 	assert.EqualError(t, err, io.EOF.Error())
 }
 
@@ -105,4 +104,20 @@ func TestRequestReaderErrorV0(t *testing.T) {
 	err := dec.Decode(&actual)
 	expectedV0 := &ErrRequest{"error", 0, 100}
 	assert.EqualError(t, err, expectedV0.Error())
+}
+
+func TestServiceResult(t *testing.T) {
+	sr := serviceRes{
+		payload: []interface{}{"A", 100},
+		err:     nil,
+	}
+
+	var (
+		s string
+		i int
+	)
+	err := sr.ExtractTuple(&s, &i)
+	assert.NoError(t, err)
+	assert.Equal(t, "A", s)
+	assert.Equal(t, 100, i)
 }

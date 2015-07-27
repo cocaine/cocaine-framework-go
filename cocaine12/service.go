@@ -16,6 +16,7 @@ type ServiceInfo struct {
 
 type ServiceResult interface {
 	Extract(interface{}) error
+	ExtractTuple(...interface{}) error
 	Result() (uint64, []interface{}, error)
 	Err() error
 }
@@ -33,6 +34,10 @@ func (s *serviceRes) Extract(target interface{}) (err error) {
 		return s.err
 	}
 	return convertPayload(s.payload, target)
+}
+
+func (s *serviceRes) ExtractTuple(args ...interface{}) error {
+	return s.Extract(&args)
 }
 
 // ToDo: Extract method for an array semantic
