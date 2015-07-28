@@ -43,7 +43,7 @@ func TestWorkerV1(t *testing.T) {
 			assert.Equal(t, method, r.Method)
 			assert.Equal(t, "HTTP/"+version, r.Proto)
 			assert.Equal(t, r.URL.String(), uri)
-			assert.Equal(t, headersCocaineToHTTP(headers), r.Header)
+			assert.Equal(t, HeadersCocaineToHTTP(headers), r.Header)
 			w.Header().Add("X-Test", "Test")
 			w.WriteHeader(http.StatusProxyAuthRequired)
 			fmt.Fprint(w, "OK")
