@@ -47,7 +47,7 @@ func UnpackProxyRequest(raw []byte) (*http.Request, error) {
 		return nil, err
 	}
 
-	req.Header = headersCocaineToHTTP(v.Headers)
+	req.Header = HeadersCocaineToHTTP(v.Headers)
 	req.Host = req.Header.Get("Host")
 
 	if xRealIP := req.Header.Get("X-Real-IP"); xRealIP != "" {
@@ -84,7 +84,7 @@ func HeadersHTTPtoCocaine(header http.Header) Headers {
 	return hdr
 }
 
-func headersCocaineToHTTP(hdr Headers) http.Header {
+func HeadersCocaineToHTTP(hdr Headers) http.Header {
 	header := make(http.Header, len(hdr))
 	for _, hdrValues := range hdr {
 		header.Add(hdrValues[0], hdrValues[1])
