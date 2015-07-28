@@ -63,7 +63,7 @@ func (l *Locator) Resolve(ctx context.Context, name string) (<-chan ResolveChann
 	}
 
 	go func() {
-		answer, err := channel.Get()
+		answer, err := channel.Get(ctx)
 		if err != nil {
 			Out <- ResolveChannelResult{
 				ServiceInfo: nil,

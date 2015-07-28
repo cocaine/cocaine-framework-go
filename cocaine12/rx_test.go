@@ -26,7 +26,7 @@ func Example_ApplicationClient() {
 	defer channel.Call("close")
 
 	// receive the answer from the application
-	answer, err := channel.Get()
+	answer, err := channel.Get(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

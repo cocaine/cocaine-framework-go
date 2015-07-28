@@ -2,6 +2,8 @@ package cocaine12
 
 import (
 	"testing"
+
+	"golang.org/x/net/context"
 )
 
 func TestLogger(t *testing.T) {
@@ -10,11 +12,12 @@ func TestLogger(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ctx := context.Background()
 	// log.SetVerbosity(InfoLevel)
-	log.WithFields(Fields{"a": 1, "b": 2}).Errf("test %v", log.Verbosity())
-	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("test %v", log.Verbosity())
-	log.WithFields(Fields{"a": 1, "b": 2}).Infof("test %v", log.Verbosity())
-	log.WithFields(Fields{"a": 1, "b": 2}).Debugf("test %v", log.Verbosity())
+	log.WithFields(Fields{"a": 1, "b": 2}).Errf("test %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("test %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Infof("test %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Debugf("test %v", log.Verbosity(ctx))
 }
 
 func BenchmarkFormatFields5(b *testing.B) {

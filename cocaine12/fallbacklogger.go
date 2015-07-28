@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+
+	"golang.org/x/net/context"
 )
 
 type fallbackLogger struct {
@@ -90,7 +92,7 @@ func (f *fallbackLogger) Debug(args ...interface{}) {
 	f.log(DebugLevel, defaultFields, fmt.Sprint(args...))
 }
 
-func (f *fallbackLogger) Verbosity() Severity {
+func (f *fallbackLogger) Verbosity(context.Context) Severity {
 	return f.severity.get()
 }
 

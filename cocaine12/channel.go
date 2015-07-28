@@ -3,7 +3,8 @@ package cocaine12
 import (
 	"fmt"
 	"sync"
-	// "time"
+
+	"golang.org/x/net/context"
 )
 
 type Channel interface {
@@ -12,7 +13,7 @@ type Channel interface {
 }
 
 type Rx interface {
-	Get() (ServiceResult, error)
+	Get(context.Context) (ServiceResult, error)
 	// GetWithTimeout(timeout time.Duration) (ServiceResult, error)
 	push(ServiceResult)
 }
@@ -32,30 +33,66 @@ type rx struct {
 
 	sync.Mutex
 	queue []ServiceResult
+	done  bool
 }
 
-func (rx *rx) Get() (ServiceResult, error) {
+func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
+	if rx.done {
+		return nil, ErrStreamIsClosed
+	}
+
 	var res ServiceResult
 
 	// fast path
 	select {
 	case res = <-rx.pushBuffer:
-		return res, nil
 	default:
-	}
-
-	rx.Lock()
-	if len(rx.queue) > 0 {
-		res = rx.queue[0]
-		select {
-		case rx.pushBuffer <- res:
-			rx.queue = rx.queue[1:]
-		default:
+		rx.Lock()
+		if len(rx.queue) > 0 {
+			res = rx.queue[0]
+			select {
+			case rx.pushBuffer <- res:
+				rx.queue = rx.queue[1:]
+			default:
+			}
 		}
-	}
-	rx.Unlock()
+		rx.Unlock()
 
-	res = <-rx.pushBuffer
+		res = <-rx.pushBuffer
+	}
+
+	treeMap := *(rx.rxTree)
+	method, _, _ := res.Result()
+	temp := treeMap[method]
+
+	switch temp.StreamDescription {
+	case EmptyDescription:
+		rx.done = true
+	case RecursiveDescription:
+		// pass
+	default:
+		rx.rxTree = temp.StreamDescription
+	}
+
+	// allow to attach various protocols
+	switch temp.Name {
+	case "error":
+		var (
+			catAndCode [2]int
+			message    string
+		)
+
+		if err := res.ExtractTuple(&catAndCode, &message); err != nil {
+			return res, err
+		}
+
+		res.setError(&ErrRequest{
+			Message:  message,
+			Category: catAndCode[0],
+			Code:     catAndCode[1],
+		})
+	}
+
 	return res, nil
 }
 

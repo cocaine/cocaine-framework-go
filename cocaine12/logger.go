@@ -1,5 +1,9 @@
 package cocaine12
 
+import (
+	"golang.org/x/net/context"
+)
+
 const defaultLoggerName = "logging"
 
 type Fields map[string]interface{}
@@ -25,7 +29,7 @@ type Logger interface {
 	log(level Severity, fields Fields, msg string, args ...interface{})
 	WithFields(Fields) *Entry
 
-	Verbosity() Severity
+	Verbosity(context.Context) Severity
 	// SetVerbosity(level Severity)
 	V(level Severity) bool
 

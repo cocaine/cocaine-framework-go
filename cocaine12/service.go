@@ -19,6 +19,8 @@ type ServiceResult interface {
 	ExtractTuple(...interface{}) error
 	Result() (uint64, []interface{}, error)
 	Err() error
+
+	setError(error)
 }
 
 type serviceRes struct {
@@ -54,6 +56,10 @@ func (s *serviceRes) Err() error {
 
 func (s *serviceRes) Error() string {
 	return s.err.Error()
+}
+
+func (s *serviceRes) setError(err error) {
+	s.err = err
 }
 
 //
@@ -219,6 +225,7 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 		rx: rx{
 			pushBuffer: make(chan ServiceResult, 1),
 			rxTree:     service.ServiceInfo.API[methodNum].Upstream,
+			done:       false,
 		},
 		tx: tx{
 			service: service,

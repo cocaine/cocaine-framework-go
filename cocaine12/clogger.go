@@ -56,7 +56,7 @@ func (c *cocaineLogger) SetVerbosity(level Severity) {
 	c.severity.set(-100)
 }
 
-func (c *cocaineLogger) Verbosity() (level Severity) {
+func (c *cocaineLogger) Verbosity(ctx context.Context) (level Severity) {
 	level = DebugLevel
 	if lvl := c.severity.get(); lvl != -100 {
 		return lvl
@@ -67,7 +67,7 @@ func (c *cocaineLogger) Verbosity() (level Severity) {
 		return
 	}
 
-	result, err := channel.Get()
+	result, err := channel.Get(ctx)
 	if err != nil {
 		return
 	}
