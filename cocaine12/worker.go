@@ -143,8 +143,6 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 	}
 
 	switch w.protoVersion {
-	case v0:
-		w.dispatcher = newV0Protocol()
 	case v1:
 		w.dispatcher = newV1Protocol()
 	default:

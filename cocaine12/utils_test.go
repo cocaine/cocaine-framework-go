@@ -73,39 +73,6 @@ func TestRequestReaderErrorV1(t *testing.T) {
 	assert.EqualError(t, err, expectedV1.Error())
 }
 
-func TestRequestReaderErrorV0(t *testing.T) {
-	type tStruct struct {
-		L string
-		N int
-	}
-
-	chunks := []tStruct{
-		{"A", 100},
-		{"B", 101},
-		{"C", 102},
-		{"D", 102},
-	}
-
-	req := newRequest(newV0Protocol())
-	for _, m := range chunks {
-		body, _ := json.Marshal(m)
-		req.push(newChunkV0(2, body))
-	}
-	req.push(newErrorV0(2, 100, "error"))
-
-	var actual tStruct
-	dec := json.NewDecoder(RequestReader(req))
-	for i := range chunks {
-		err := dec.Decode(&actual)
-		assert.NoError(t, err)
-		assert.Equal(t, chunks[i], actual)
-	}
-
-	err := dec.Decode(&actual)
-	expectedV0 := &ErrRequest{"error", 0, 100}
-	assert.EqualError(t, err, expectedV0.Error())
-}
-
 func TestServiceResult(t *testing.T) {
 	sr := serviceRes{
 		payload: []interface{}{"A", 100},

@@ -2,6 +2,7 @@ package cocaine12
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -9,6 +10,36 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
+
+type pipeConn struct {
+	reader *io.PipeReader
+	writer *io.PipeWriter
+}
+
+func (p *pipeConn) Read(b []byte) (int, error) {
+	return p.reader.Read(b)
+}
+func (p *pipeConn) Write(b []byte) (int, error) {
+	return p.writer.Write(b)
+}
+func (p *pipeConn) Close() error {
+	p.reader.Close()
+	return p.writer.Close()
+}
+func testConn() (io.ReadWriteCloser, io.ReadWriteCloser) {
+	read1, write1 := io.Pipe()
+	read2, write2 := io.Pipe()
+	return &pipeConn{read1, write2}, &pipeConn{read2, write1}
+}
+
+func checkTypeAndSession(t *testing.T, msg *Message, eSession uint64, eType uint64) {
+	if msg.MsgType != eType {
+		t.Fatalf("%d expected, but got %d: %v", eType, msg.MsgType, msg)
+	}
+	if msg.Session != eSession {
+		t.Fatalf("Bad session number: %d instead of %d", msg.Session, eSession)
+	}
+}
 
 func TestWorkerV1(t *testing.T) {
 	const (
