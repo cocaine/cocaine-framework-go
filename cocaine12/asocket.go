@@ -33,19 +33,23 @@ type socketIO interface {
 }
 
 type asyncBuff struct {
-	wg sync.WaitGroup
-
 	in  chan *Message
 	out chan *Message
 
 	stop chan (<-chan time.Time)
+	wait chan struct{}
 }
 
 func newAsyncBuf() *asyncBuff {
 	buf := &asyncBuff{
-		in:   make(chan *Message),
-		out:  make(chan *Message),
+		in:  make(chan *Message),
+		out: make(chan *Message),
+
+		// to stop my loop
 		stop: make(chan (<-chan time.Time)),
+		// to wait for a notifycation
+		// from the loop that it's stopped
+		wait: make(chan struct{}),
 	}
 
 	buf.loop()
@@ -53,10 +57,8 @@ func newAsyncBuf() *asyncBuff {
 }
 
 func (bf *asyncBuff) loop() {
-	bf.wg.Add(1)
-
 	go func() {
-		defer bf.wg.Done()
+		defer close(bf.wait)
 
 		// Notify a receiver
 		defer close(bf.out)
@@ -135,7 +137,11 @@ func (bf *asyncBuff) loop() {
 // It is prohibited to call Drain afer Stop
 func (bf *asyncBuff) Stop() error {
 	close(bf.stop)
-	bf.wg.Wait()
+	select {
+	case <-bf.wait:
+	case <-time.After(time.Second):
+	}
+
 	return nil
 }
 
