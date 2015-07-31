@@ -24,7 +24,7 @@ const (
 var (
 	// ErrDisowned raises when the worker doesn't receive
 	// a heartbeat message during a heartbeat timeout
-	ErrDisowned = errors.New("disowned")
+	ErrDisowned = errors.New("disowned from cocaine-runtime")
 )
 
 type requestStream interface {
@@ -143,8 +143,6 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 	}
 
 	switch w.protoVersion {
-	case v0:
-		w.dispatcher = newV0Protocol()
 	case v1:
 		w.dispatcher = newV1Protocol()
 	default:
@@ -161,7 +159,9 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 
 	// Send handshake to notify cocaine-runtime
 	// that we have started
-	w.sendHandshake()
+	if err := w.sendHandshake(); err != nil {
+		return nil, err
+	}
 
 	return w, nil
 }
@@ -218,7 +218,6 @@ func (w *Worker) isStopped() bool {
 }
 
 func (w *Worker) loop() error {
-	var err error
 	// Send heartbeat to notify cocaine-runtime
 	// we are ready to work
 	w.onHeartbeatTimeout()
@@ -228,22 +227,20 @@ func (w *Worker) loop() error {
 		case msg, ok := <-w.conn.Read():
 			if ok {
 				// otherwise the connection is closed
-				w.dispatcher.onMessage(w, msg)
+				w.dispatcher.onMessage(w, msg) // non-blocking
 			}
 
 		case <-w.heartbeatTimer.C:
 			// Reset (start) disown & heartbeat timers
 			// Send a heartbeat message to cocaine-runtime
-			w.onHeartbeatTimeout()
+			w.onHeartbeatTimeout() // non-blocking
 
 		case <-w.disownTimer.C:
-			w.onDisownTimeout()
-			err = ErrDisowned
+			w.onDisownTimeout() // non-blocking
+			return ErrDisowned
 
 		case <-w.stopped:
-			// If worker is disowned
-			// err is set to ErrDisowned
-			return err
+			return nil
 		}
 	}
 }
@@ -255,25 +252,29 @@ func (w *Worker) onDisownTimeout() {
 }
 
 func (w *Worker) onHeartbeatTimeout() {
-	select {
-	case w.conn.Write() <- w.dispatcher.newHeartbeat():
-	case <-w.conn.IsClosed():
-	}
-
 	// Wait for the reply until disown timeout comes
 	w.disownTimer.Reset(disownTimeout)
 	// Send next heartbeat over heartbeatTimeout
 	w.heartbeatTimer.Reset(heartbeatTimeout)
+
+	select {
+	case w.conn.Write() <- w.dispatcher.newHeartbeat():
+	case <-w.conn.IsClosed():
+	case <-time.After(disownTimeout):
+	}
 }
 
 // Send handshake message to cocaine-runtime
 // It is needed to be called only once on a startup
 // to notify runtime that we have started
-func (w *Worker) sendHandshake() {
+func (w *Worker) sendHandshake() error {
 	select {
 	case w.conn.Write() <- w.dispatcher.newHandshake(w.id):
 	case <-w.conn.IsClosed():
+	case <-time.After(disownTimeout):
+		return fmt.Errorf("unable to send a handshake for a long time")
 	}
+	return nil
 }
 
 // Message handlers
