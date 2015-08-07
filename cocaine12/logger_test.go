@@ -14,10 +14,10 @@ func TestLogger(t *testing.T) {
 
 	ctx := context.Background()
 	// log.SetVerbosity(InfoLevel)
-	log.WithFields(Fields{"a": 1, "b": 2}).Errf("test %v", log.Verbosity(ctx))
-	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("test %v", log.Verbosity(ctx))
-	log.WithFields(Fields{"a": 1, "b": 2}).Infof("test %v", log.Verbosity(ctx))
-	log.WithFields(Fields{"a": 1, "b": 2}).Debugf("test %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Errf("Error %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("Warning %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Infof("Info %v", log.Verbosity(ctx))
+	log.WithFields(Fields{"a": 1, "b": 2}).Debugf("Debug %v", log.Verbosity(ctx))
 }
 
 func BenchmarkFormatFields5(b *testing.B) {
