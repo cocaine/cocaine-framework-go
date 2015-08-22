@@ -39,13 +39,12 @@ CONN_LOOP:
 	}
 
 	service := Service{
-		ServiceInfo:    newLocatorServiceInfo(),
-		socketIO:       sock,
-		sessions:       newSessions(),
-		stop:           make(chan struct{}),
-		args:           endpoints,
-		name:           "locator",
-		isReconnecting: false,
+		ServiceInfo: newLocatorServiceInfo(),
+		socketIO:    sock,
+		sessions:    newSessions(),
+		stop:        make(chan struct{}),
+		args:        endpoints,
+		name:        "locator",
 	}
 	go service.loop()
 

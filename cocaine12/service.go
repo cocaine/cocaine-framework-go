@@ -55,6 +55,9 @@ func (s *serviceRes) Err() error {
 }
 
 func (s *serviceRes) Error() string {
+	if s.err == nil {
+		return "<nil>"
+	}
 	return s.err.Error()
 }
 
@@ -84,9 +87,8 @@ type Service struct {
 	sessions *sessions
 	stop     chan struct{}
 
-	args           []string
-	name           string
-	isReconnecting bool
+	args []string
+	name string
 }
 
 //Creates new service instance with specifed name.
@@ -136,13 +138,12 @@ func NewService(ctx context.Context, name string, endpoints []string) (s *Servic
 	}
 
 	s = &Service{
-		socketIO:       sock,
-		ServiceInfo:    info,
-		sessions:       newSessions(),
-		stop:           make(chan struct{}),
-		args:           endpoints,
-		name:           name,
-		isReconnecting: false,
+		socketIO:    sock,
+		ServiceInfo: info,
+		sessions:    newSessions(),
+		stop:        make(chan struct{}),
+		args:        endpoints,
+		name:        name,
 	}
 	go s.loop()
 	return
@@ -160,59 +161,49 @@ func (service *Service) loop() {
 }
 
 func (service *Service) Reconnect(force bool) error {
-	if !service.isReconnecting {
-		service.mutex.Lock()
-		defer service.mutex.Unlock()
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
 
-		if service.isReconnecting {
-			return fmt.Errorf("%s", "Service is reconnecting now")
+	if !force {
+		select {
+		case <-service.IsClosed():
+		default:
+			return fmt.Errorf("Service is already connected")
 		}
-
-		service.isReconnecting = true
-		defer func() { service.isReconnecting = false }()
-
-		if !force {
-			select {
-			case <-service.IsClosed():
-			default:
-				return fmt.Errorf("%s", "Service is already connected")
-			}
-		}
-
-		// Send error to all open sessions
-		for _, key := range service.sessions.Keys() {
-			service.sessions.RLock()
-			if ch, ok := service.sessions.Get(key); ok {
-				ch.push(&serviceRes{
-					payload: nil,
-					method:  1,
-					err:     &ServiceError{-100, "Disconnected"}})
-			}
-			service.sessions.RUnlock()
-			service.sessions.Detach(key)
-		}
-
-		// Create new socket
-		info, err := serviceResolve(context.Background(), service.name, service.args)
-		if err != nil {
-			return err
-		}
-		sock, err := serviceCreateIO(info.Endpoints)
-		if err != nil {
-			return err
-		}
-
-		// Dispose old IO interface
-		service.Close()
-
-		// Reattach channels and network IO
-		service.stop = make(chan struct{})
-		service.socketIO = sock
-		// Start service loop
-		go service.loop()
-		return nil
 	}
-	return fmt.Errorf("Service is reconnecting now")
+
+	// Send error to all open sessions
+	for _, key := range service.sessions.Keys() {
+		service.sessions.RLock()
+		if ch, ok := service.sessions.Get(key); ok {
+			ch.push(&serviceRes{
+				payload: nil,
+				method:  1,
+				err:     &ServiceError{-100, "Disconnected"}})
+		}
+		service.sessions.RUnlock()
+		service.sessions.Detach(key)
+	}
+
+	// Create new socket
+	info, err := serviceResolve(context.Background(), service.name, service.args)
+	if err != nil {
+		return err
+	}
+	sock, err := serviceCreateIO(info.Endpoints)
+	if err != nil {
+		return err
+	}
+
+	// Dispose old IO interface
+	service.Close()
+
+	// Reattach channels and network IO
+	service.stop = make(chan struct{})
+	service.socketIO = sock
+	// Start service loop
+	go service.loop()
+	return nil
 }
 
 func (service *Service) call(name string, args ...interface{}) (Channel, error) {
