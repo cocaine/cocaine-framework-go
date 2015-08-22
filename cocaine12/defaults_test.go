@@ -18,7 +18,17 @@ func TestParseArgs(t *testing.T) {
 		"--uuid", "uuid", "--protocol", "1",
 		"--endpoint", "/var/run/cocaine/sock"}
 	def := newDeafults(args, "test")
-	assert.Equal(t, 1, def.Protocol, "invalid protocol version")
-	assert.Equal(t, "uuid", def.UUID, "invalid uuid")
-	assert.Equal(t, "/var/run/cocaine/sock", def.Endpoint, "invalid endpoint")
+	assert.Equal(t, 1, def.Protocol(), "invalid protocol version")
+	assert.Equal(t, "uuid", def.UUID(), "invalid uuid")
+	assert.Equal(t, "/var/run/cocaine/sock", def.Endpoint(), "invalid endpoint")
+	assert.Equal(t, []string{"host1:10053", "127.0.0.1:10054"}, def.Locators(), "invalid locators")
+}
+
+func TestParseArgsWithoutLocators(t *testing.T) {
+	args := []string{}
+	def := newDeafults(args, "test")
+	assert.Equal(t, 0, def.Protocol(), "invalid protocol version")
+	// assert.Equal(t, "uuid", def.UUID(), "invalid uuid")
+	// assert.Equal(t, "/var/run/cocaine/sock", def.Endpoint(), "invalid endpoint")
+	assert.Equal(t, []string{"localhost:10053"}, def.Locators(), "invalid locators")
 }

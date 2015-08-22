@@ -42,7 +42,7 @@ func newCocaineLogger(name string, endpoints ...string) (Logger, error) {
 	logger := &cocaineLogger{
 		Service:  service,
 		severity: -100,
-		prefix:   fmt.Sprintf("app/%s", defaults.AppName),
+		prefix:   fmt.Sprintf("app/%s", GetDefaults().ApplicationName()),
 	}
 	return logger, nil
 }

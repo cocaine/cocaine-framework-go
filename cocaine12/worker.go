@@ -107,9 +107,9 @@ type Worker struct {
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
 func NewWorker() (*Worker, error) {
-	workerID := defaults.UUID
+	workerID := GetDefaults().UUID()
 
-	unixSocketEndpoint := defaults.Endpoint
+	unixSocketEndpoint := GetDefaults().Endpoint()
 	if unixSocketEndpoint == "" {
 		return nil, fmt.Errorf("cocaine endpoint must be specified")
 	}
@@ -120,7 +120,7 @@ func NewWorker() (*Worker, error) {
 		return nil, err
 	}
 
-	return newWorker(sock, workerID, defaults.Protocol, defaults.Debug)
+	return newWorker(sock, workerID, GetDefaults().Protocol(), GetDefaults().Debug())
 }
 
 func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
