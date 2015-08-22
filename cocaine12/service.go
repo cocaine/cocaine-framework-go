@@ -78,7 +78,7 @@ func (err *ServiceError) Error() string {
 // Allows you to invoke methods of services and send events to other cloud applications.
 type Service struct {
 	// Tracking a connection state
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	wg    sync.WaitGroup
 
 	socketIO
@@ -164,12 +164,8 @@ func (service *Service) Reconnect(force bool) error {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
 
-	if !force {
-		select {
-		case <-service.IsClosed():
-		default:
-			return fmt.Errorf("Service is already connected")
-		}
+	if !force && !service.disconnected() {
+		return nil
 	}
 
 	// Send error to all open sessions
@@ -196,7 +192,7 @@ func (service *Service) Reconnect(force bool) error {
 	}
 
 	// Dispose old IO interface
-	service.Close()
+	service.close()
 
 	// Reattach channels and network IO
 	service.stop = make(chan struct{})
@@ -207,6 +203,9 @@ func (service *Service) Reconnect(force bool) error {
 }
 
 func (service *Service) call(name string, args ...interface{}) (Channel, error) {
+	service.mutex.RLock()
+	defer service.mutex.RUnlock()
+
 	methodNum, err := service.API.MethodByName(name)
 	if err != nil {
 		return nil, err
@@ -240,25 +239,44 @@ func (service *Service) call(name string, args ...interface{}) (Channel, error) 
 	return &ch, nil
 }
 
+func (service *Service) disconnected() bool {
+	service.mutex.RLock()
+	defer service.mutex.RUnlock()
+	select {
+	case <-service.IsClosed():
+		return true
+	default:
+		return false
+	}
+}
+
 func (service *Service) sendMsg(msg *Message) {
+	service.mutex.RLock()
 	service.socketIO.Write() <- msg
+	service.mutex.RUnlock()
 }
 
 //Calls a remote method by name and pass args
 func (service *Service) Call(name string, args ...interface{}) (Channel, error) {
-	select {
-	case <-service.IsClosed():
+	if service.disconnected() {
 		if err := service.Reconnect(false); err != nil {
 			return nil, err
 		}
-	default:
 	}
+
 	return service.call(name, args...)
 }
 
-//Disposes resources of a service. You must call this method if the service isn't used anymore.
+// Disposes resources of a service. You must call this method if the service isn't used anymore.
 func (service *Service) Close() {
-	// Broadcast all related goroutines about disposing
+	service.mutex.RLock()
+	// Broadcast all related
+	// goroutines about disposing
+	service.close()
+	service.mutex.RUnlock()
+}
+
+func (service *Service) close() {
 	close(service.stop)
 	service.socketIO.Close()
 }
