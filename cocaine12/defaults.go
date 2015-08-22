@@ -2,6 +2,7 @@ package cocaine12
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -90,8 +91,14 @@ func parseLocators(arg string) []string {
 }
 
 func newDeafults(args []string, setname string) *defaultValues {
-	values := new(defaultValues)
+	var (
+		values = new(defaultValues)
+
+		showVersion bool
+	)
+
 	values.locators = []string{defaultLocatorEndpoint}
+	values.debug = strings.ToUpper(os.Getenv("DEBUG")) == "DEBUG"
 
 	flagSet := flag.NewFlagSet(setname, flag.ContinueOnError)
 	flagSet.StringVar(&values.appName, "app", "gostandalone", "application name")
@@ -99,8 +106,13 @@ func newDeafults(args []string, setname string) *defaultValues {
 	flagSet.Var(&values.locators, "locator", "default endpoints of locators")
 	flagSet.IntVar(&values.protocol, "protocol", defaultProtocolVersion, "protocol version")
 	flagSet.StringVar(&values.uuid, "uuid", "", "UUID")
+	flagSet.BoolVar(&showVersion, "showcocaineversion", false, "print framework version")
 	flagSet.Parse(args)
 
-	values.debug = strings.ToUpper(os.Getenv("DEBUG")) == "DEBUG"
+	if showVersion {
+		fmt.Fprintf(os.Stderr, "Built with Cocaine framework %s\n", frameworkVersion)
+		os.Exit(0)
+	}
+
 	return values
 }
