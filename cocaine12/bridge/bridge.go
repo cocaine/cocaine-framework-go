@@ -85,7 +85,7 @@ func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 		// Read the first chunk
 		// It consists of method, uri, httpversion, headers, body.
 		// They are packed by msgpack
-		msg, err := request.Read()
+		msg, err := request.Read(ctx)
 		if err != nil {
 			if cocaine.IsTimeout(err) {
 				response.Write(cocaine.WriteHead(http.StatusRequestTimeout, cocaine.Headers{}))

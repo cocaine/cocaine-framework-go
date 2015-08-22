@@ -1,9 +1,8 @@
 package cocainetest
 
 import (
-	"time"
-
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
+	"golang.org/x/net/context"
 )
 
 type Request struct {
@@ -23,7 +22,7 @@ func (r *Request) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (r *Request) Read(timeout ...time.Duration) (chunk []byte, err error) {
+func (r *Request) Read(ctx context.Context) (chunk []byte, err error) {
 	if len(r.chunks) == 0 {
 		return nil, cocaine.ErrStreamIsClosed
 	}
