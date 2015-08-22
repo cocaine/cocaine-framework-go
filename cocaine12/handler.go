@@ -4,7 +4,8 @@ import (
 	"errors"
 	"io"
 	"syscall"
-	"time"
+
+	"golang.org/x/net/context"
 )
 
 type request struct {
@@ -70,14 +71,7 @@ func newRequest(mtd messageTypeDetector) *request {
 	return request
 }
 
-// ToDo: context?
-func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
-	var onTimeout <-chan time.Time
-
-	if len(timeout) > 0 {
-		onTimeout = time.After(timeout[0])
-	}
-
+func (request *request) Read(ctx context.Context) ([]byte, error) {
 	select {
 	// Choke never reaches this select,
 	// as it is simulated by closing toHandler channel.
@@ -94,36 +88,26 @@ func (request *request) Read(timeout ...time.Duration) ([]byte, error) {
 			return nil, ErrBadPayload
 		}
 
-		// return nil, fmt.Errorf("error %s", msg.Payload)
 		// Error message
-		err := &ErrRequest{}
 		if len(msg.Payload) == 0 {
 			return nil, ErrMalformedErrorMessage
 		}
 
-		switch msg.Payload[0].(type) {
-		case int, uint, int64:
-			var perr struct {
-				Code    int
-				Message string
-			}
-			convertPayload(msg.Payload, &perr)
-			err.Message = perr.Message
-			err.Code = perr.Code
-
-		default:
-			var perr struct {
-				CodeInfo [2]int
-				Message  string
-			}
-
-			convertPayload(msg.Payload, &perr)
-			err.Message = perr.Message
-			err.Category, err.Code = perr.CodeInfo[0], perr.CodeInfo[1]
+		var perr struct {
+			CodeInfo [2]int
+			Message  string
 		}
 
-		return nil, err
-	case <-onTimeout:
+		if err := convertPayload(msg.Payload, &perr); err != nil {
+			return nil, err
+		}
+
+		return nil, &ErrRequest{
+			Message:  perr.Message,
+			Category: perr.CodeInfo[0],
+			Code:     perr.CodeInfo[1],
+		}
+	case <-ctx.Done():
 		return nil, ErrTimeout
 	}
 }

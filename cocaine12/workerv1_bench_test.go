@@ -35,7 +35,7 @@ func doBenchmarkWorkerEcho(b *testing.B, bullets uint64) {
 	w.On("echo", func(ctx context.Context, req Request, resp Response) {
 		defer resp.Close()
 
-		data, err := req.Read()
+		data, err := req.Read(ctx)
 		if err != nil {
 			panic(err)
 		}

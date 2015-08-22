@@ -5,6 +5,8 @@ import (
 	"io"
 	"testing"
 
+	"golang.org/x/net/context"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,6 +15,8 @@ func TestRequestReaderEOF(t *testing.T) {
 		L string
 		N int
 	}
+
+	ctx := context.Background()
 
 	chunks := []tStruct{
 		{"A", 100},
@@ -29,7 +33,7 @@ func TestRequestReaderEOF(t *testing.T) {
 	req.Close()
 
 	var actual tStruct
-	dec := json.NewDecoder(RequestReader(req))
+	dec := json.NewDecoder(RequestReader(ctx, req))
 	for i := range chunks {
 		err := dec.Decode(&actual)
 		assert.NoError(t, err)
@@ -46,6 +50,8 @@ func TestRequestReaderErrorV1(t *testing.T) {
 		N int
 	}
 
+	ctx := context.Background()
+
 	chunks := []tStruct{
 		{"A", 100},
 		{"B", 101},
@@ -61,7 +67,7 @@ func TestRequestReaderErrorV1(t *testing.T) {
 	req.push(newErrorV1(2, 100, 200, "error"))
 
 	var actual tStruct
-	dec := json.NewDecoder(RequestReader(req))
+	dec := json.NewDecoder(RequestReader(ctx, req))
 	for i := range chunks {
 		err := dec.Decode(&actual)
 		assert.NoError(t, err)

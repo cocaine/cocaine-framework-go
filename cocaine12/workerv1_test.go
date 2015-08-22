@@ -61,13 +61,13 @@ func TestWorkerV1(t *testing.T) {
 
 	handlers := map[string]EventHandler{
 		"test": func(ctx context.Context, req Request, res Response) {
-			data, _ := req.Read()
+			data, _ := req.Read(ctx)
 			t.Logf("Request data: %s", data)
 			res.Write(data)
 			res.Close()
 		},
 		"error": func(ctx context.Context, req Request, res Response) {
-			_, _ = req.Read()
+			_, _ = req.Read(ctx)
 			res.ErrorMsg(-100, "dummyError")
 		},
 		"http": WrapHandlerFunc(func(w http.ResponseWriter, r *http.Request) {

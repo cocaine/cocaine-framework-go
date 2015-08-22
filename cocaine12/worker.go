@@ -34,7 +34,7 @@ type requestStream interface {
 
 // Request provides an interface for a handler to get data
 type Request interface {
-	Read(timeout ...time.Duration) ([]byte, error)
+	Read(ctx context.Context) ([]byte, error)
 }
 
 // ResponseStream provides an interface for a handler to reply
