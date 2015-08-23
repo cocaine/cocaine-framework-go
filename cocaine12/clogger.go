@@ -2,7 +2,6 @@ package cocaine12
 
 import (
 	"fmt"
-	"time"
 
 	"golang.org/x/net/context"
 )
@@ -29,11 +28,7 @@ func formatFields(f Fields) []attrPair {
 	return formatted
 }
 
-func newCocaineLogger(name string, endpoints ...string) (Logger, error) {
-	timeout := time.Second * 5
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
+func newCocaineLogger(ctx context.Context, name string, endpoints ...string) (Logger, error) {
 	service, err := NewService(ctx, name, endpoints)
 	if err != nil {
 		return nil, err

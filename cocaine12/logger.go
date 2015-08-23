@@ -39,12 +39,12 @@ var defaultFields = Fields{}
 
 // NewLogger tries to create a cocaine.Logger. It fallbacks to a simple implementation
 // if the cocaine.Logger is unavailable
-func NewLogger(endpoints ...string) (Logger, error) {
-	return NewLoggerWithName(defaultLoggerName, endpoints...)
+func NewLogger(ctx context.Context, endpoints ...string) (Logger, error) {
+	return NewLoggerWithName(ctx, defaultLoggerName, endpoints...)
 }
 
-func NewLoggerWithName(name string, endpoints ...string) (Logger, error) {
-	l, err := newCocaineLogger(name, endpoints...)
+func NewLoggerWithName(ctx context.Context, name string, endpoints ...string) (Logger, error) {
+	l, err := newCocaineLogger(ctx, name, endpoints...)
 	if err != nil {
 		return newFallbackLogger()
 	}

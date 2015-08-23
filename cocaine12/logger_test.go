@@ -7,12 +7,12 @@ import (
 )
 
 func TestLogger(t *testing.T) {
-	log, err := NewLogger()
+	ctx := context.Background()
+	log, err := NewLogger(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
 	// log.SetVerbosity(InfoLevel)
 	log.WithFields(Fields{"a": 1, "b": 2}).Errf("Error %v", log.Verbosity(ctx))
 	log.WithFields(Fields{"a": 1, "b": 2}).Warnf("Warning %v", log.Verbosity(ctx))
