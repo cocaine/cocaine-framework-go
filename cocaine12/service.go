@@ -160,7 +160,7 @@ func (service *Service) loop() {
 	}
 }
 
-func (service *Service) Reconnect(force bool) error {
+func (service *Service) Reconnect(ctx context.Context, force bool) error {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
 
@@ -182,7 +182,7 @@ func (service *Service) Reconnect(force bool) error {
 	}
 
 	// Create new socket
-	info, err := serviceResolve(context.Background(), service.name, service.args)
+	info, err := serviceResolve(ctx, service.name, service.args)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (service *Service) Reconnect(force bool) error {
 	return nil
 }
 
-func (service *Service) call(name string, args ...interface{}) (Channel, error) {
+func (service *Service) call(ctx context.Context, name string, args ...interface{}) (Channel, error) {
 	service.mutex.RLock()
 	defer service.mutex.RUnlock()
 
@@ -257,14 +257,14 @@ func (service *Service) sendMsg(msg *Message) {
 }
 
 //Calls a remote method by name and pass args
-func (service *Service) Call(name string, args ...interface{}) (Channel, error) {
+func (service *Service) Call(ctx context.Context, name string, args ...interface{}) (Channel, error) {
 	if service.disconnected() {
-		if err := service.Reconnect(false); err != nil {
+		if err := service.Reconnect(ctx, false); err != nil {
 			return nil, err
 		}
 	}
 
-	return service.call(name, args...)
+	return service.call(ctx, name, args...)
 }
 
 // Disposes resources of a service. You must call this method if the service isn't used anymore.

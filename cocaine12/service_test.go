@@ -31,7 +31,7 @@ func TestService(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			ch, err := s.Call("enqueue", "ping")
+			ch, err := s.Call(ctx, "enqueue", "ping")
 			if err != nil {
 				fmt.Println(err)
 				t.Fatal(err)

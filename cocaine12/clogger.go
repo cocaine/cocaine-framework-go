@@ -51,18 +51,13 @@ func (c *cocaineLogger) Close() {
 	c.Service.Close()
 }
 
-func (c *cocaineLogger) SetVerbosity(level Severity) {
-	c.Service.Call("set_verbosity", level)
-	c.severity.set(-100)
-}
-
 func (c *cocaineLogger) Verbosity(ctx context.Context) (level Severity) {
 	level = DebugLevel
 	if lvl := c.severity.get(); lvl != -100 {
 		return lvl
 	}
 
-	channel, err := c.Service.Call("verbosity")
+	channel, err := c.Service.Call(ctx, "verbosity")
 	if err != nil {
 		return
 	}

@@ -56,7 +56,7 @@ CONN_LOOP:
 
 func (l *Locator) Resolve(ctx context.Context, name string) (<-chan ResolveChannelResult, error) {
 	Out := make(chan ResolveChannelResult, 1)
-	channel, err := l.Service.Call("resolve", name)
+	channel, err := l.Service.Call(ctx, "resolve", name)
 	if err != nil {
 		return nil, err
 	}

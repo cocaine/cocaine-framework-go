@@ -30,7 +30,6 @@ type Logger interface {
 	WithFields(Fields) *Entry
 
 	Verbosity(context.Context) Severity
-	// SetVerbosity(level Severity)
 	V(level Severity) bool
 
 	Close()

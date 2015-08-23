@@ -14,7 +14,7 @@ func Example_ApplicationClient() {
 	}
 
 	// Create channle to communicate with method "ping"
-	channel, err := s.Call("enqueue", "ping")
+	channel, err := s.Call(ctx, "enqueue", "ping")
 	if err != nil {
 		log.Fatal(err)
 	}
