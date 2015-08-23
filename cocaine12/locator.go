@@ -6,16 +6,21 @@ import (
 	"golang.org/x/net/context"
 )
 
-type ResolveChannelResult struct {
-	*ServiceInfo
-	Err error
+// type ResolveChannelResult struct {
+// 	*ServiceInfo
+// 	Err error
+// }
+
+type Locator interface {
+	Resolve(ctx context.Context, name string) (*ServiceInfo, error)
+	Close()
 }
 
-type Locator struct {
+type locator struct {
 	*Service
 }
 
-func NewLocator(endpoints []string) (*Locator, error) {
+func NewLocator(endpoints []string) (Locator, error) {
 	if len(endpoints) == 0 {
 		endpoints = append(endpoints, GetDefaults().Locators()...)
 	}
@@ -25,6 +30,7 @@ func NewLocator(endpoints []string) (*Locator, error) {
 		err  error
 	)
 
+	// ToDo: Duplicated code with Service connection
 CONN_LOOP:
 	for _, endpoint := range endpoints {
 		sock, err = newAsyncConnection("tcp", endpoint, time.Second*1)
@@ -48,47 +54,30 @@ CONN_LOOP:
 	}
 	go service.loop()
 
-	l := &Locator{
+	return &locator{
 		Service: &service,
-	}
-	return l, nil
+	}, nil
 }
 
-func (l *Locator) Resolve(ctx context.Context, name string) (<-chan ResolveChannelResult, error) {
-	Out := make(chan ResolveChannelResult, 1)
+func (l *locator) Resolve(ctx context.Context, name string) (*ServiceInfo, error) {
 	channel, err := l.Service.Call(ctx, "resolve", name)
 	if err != nil {
 		return nil, err
 	}
 
-	go func() {
-		answer, err := channel.Get(ctx)
-		if err != nil {
-			Out <- ResolveChannelResult{
-				ServiceInfo: nil,
-				Err:         err,
-			}
-			return
-		}
+	answer, err := channel.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-		var serviceInfo ServiceInfo
-		if err := answer.Extract(&serviceInfo); err != nil {
-			Out <- ResolveChannelResult{
-				ServiceInfo: nil,
-				Err:         err,
-			}
-		}
+	var serviceInfo ServiceInfo
+	if err := answer.Extract(&serviceInfo); err != nil {
+		return nil, err
+	}
 
-		Out <- ResolveChannelResult{
-			ServiceInfo: &serviceInfo,
-			Err:         nil,
-		}
-
-	}()
-
-	return Out, nil
+	return &serviceInfo, nil
 }
 
-func (l *Locator) Close() {
+func (l *locator) Close() {
 	l.socketIO.Close()
 }

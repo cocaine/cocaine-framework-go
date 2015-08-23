@@ -93,22 +93,14 @@ type Service struct {
 
 //Creates new service instance with specifed name.
 //Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
-func serviceResolve(ctx context.Context, name string, endpoints []string) (info *ServiceInfo, err error) {
+func serviceResolve(ctx context.Context, name string, endpoints []string) (*ServiceInfo, error) {
 	l, err := NewLocator(endpoints)
-	if err != nil {
-		return
-	}
-	defer l.Close()
-
-	ch, err := l.Resolve(ctx, name)
 	if err != nil {
 		return nil, err
 	}
+	defer l.Close()
 
-	serviceInfo := <-ch
-	info = serviceInfo.ServiceInfo
-	err = serviceInfo.Err
-	return
+	return l.Resolve(ctx, name)
 }
 
 func serviceCreateIO(endpoints []EndpointItem) (sock socketIO, err error) {
