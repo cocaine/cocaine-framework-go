@@ -14,7 +14,6 @@ type Channel interface {
 
 type Rx interface {
 	Get(context.Context) (ServiceResult, error)
-	// GetWithTimeout(timeout time.Duration) (ServiceResult, error)
 	push(ServiceResult)
 }
 
