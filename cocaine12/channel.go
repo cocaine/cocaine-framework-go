@@ -19,7 +19,7 @@ type Rx interface {
 }
 
 type Tx interface {
-	Call(name string, args ...interface{}) error
+	Call(ctx context.Context, name string, args ...interface{}) error
 }
 
 type channel struct {
@@ -114,7 +114,7 @@ type tx struct {
 	done    bool
 }
 
-func (tx *tx) Call(name string, args ...interface{}) error {
+func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error {
 	if tx.done {
 		return fmt.Errorf("tx is done")
 	}

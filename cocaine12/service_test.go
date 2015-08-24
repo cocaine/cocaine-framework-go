@@ -36,10 +36,10 @@ func TestService(t *testing.T) {
 				fmt.Println(err)
 				t.Fatal(err)
 			}
-			defer ch.Call("close")
+			defer ch.Call(ctx, "close")
 			atomic.AddUint64(&call, 1)
 
-			ch.Call("write", []byte("OK"))
+			ch.Call(ctx, "write", []byte("OK"))
 			atomic.AddUint64(&write, 1)
 
 			if _, err = ch.Get(ctx); err != nil {
