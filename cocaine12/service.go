@@ -81,6 +81,9 @@ type Service struct {
 	mutex sync.RWMutex
 	wg    sync.WaitGroup
 
+	// To keep ordering of opening new sessions
+	muKeepSessionOrder sync.Mutex
+
 	socketIO
 	*ServiceInfo
 
@@ -217,9 +220,13 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		},
 	}
 
+	// We must create new sessions in the monotonic order
+	// Protect sending messages, which open new sessions.
+	service.muKeepSessionOrder.Lock()
+	defer service.muKeepSessionOrder.Unlock()
+
 	ch.tx.id = service.sessions.Attach(&ch)
 
-	// FIX THIS!!!
 	msg := &Message{
 		CommonMessageInfo{
 			ch.tx.id,

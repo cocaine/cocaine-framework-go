@@ -2,6 +2,7 @@ package cocaine12
 
 import (
 	"fmt"
+	"sync"
 
 	"golang.org/x/net/context"
 )
@@ -10,6 +11,8 @@ const loggerEmit = 0
 
 type cocaineLogger struct {
 	*Service
+
+	mu       sync.Mutex
 	severity Severity
 	prefix   string
 }
@@ -102,6 +105,8 @@ func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...i
 		methodArgs,
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.Service.sendMsg(loggermsg)
 }
 
