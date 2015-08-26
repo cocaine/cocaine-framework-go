@@ -26,23 +26,20 @@ func newV1Protocol() protocolDispather {
 	}
 }
 
-func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) {
+func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) error {
 	if msg.Session == v1UtilitySession {
-		v.dispatchUtilityMessage(p, msg)
-		return
+		return v.dispatchUtilityMessage(p, msg)
 	}
 
 	if v.maxSession < msg.Session {
 		// It must be Invkoke
 		if msg.MsgType != v1Invoke {
-			fmt.Printf("new session %d must start from invoke type %d, not %d\n",
+			return fmt.Errorf("new session %d must start from invoke type %d, not %d\n",
 				msg.Session, v1Invoke, msg.MsgType)
-			return
 		}
 
 		v.maxSession = msg.Session
-		p.onInvoke(msg)
-		return
+		return p.onInvoke(msg)
 	}
 
 	switch msg.MsgType {
@@ -53,21 +50,26 @@ func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) {
 	case v1Error:
 		p.onError(msg)
 	default:
-		fmt.Printf("invalid message type: %d, message %v", msg.MsgType, msg)
+		return fmt.Errorf("an invalid message type: %d, message %v", msg.MsgType, msg)
 	}
+	return nil
 }
 
 func (v *v1Protocol) isChunk(msg *Message) bool {
 	return msg.MsgType == v1Write
 }
 
-func (v *v1Protocol) dispatchUtilityMessage(p protocolHandler, msg *Message) {
+func (v *v1Protocol) dispatchUtilityMessage(p protocolHandler, msg *Message) error {
 	switch msg.MsgType {
 	case v1Heartbeat:
 		p.onHeartbeat(msg)
 	case v1Terminate:
 		p.onTerminate(msg)
+	default:
+		return fmt.Errorf("an invalid utility message type %d", msg.MsgType)
 	}
+
+	return nil
 }
 
 func (v *v1Protocol) newHandshake(id string) *Message {

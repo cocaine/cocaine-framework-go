@@ -27,7 +27,7 @@ type protocolHandler interface {
 	onChunk(msg *Message)
 	onError(msg *Message)
 	onHeartbeat(msg *Message)
-	onInvoke(msg *Message)
+	onInvoke(msg *Message) error
 	onTerminate(msg *Message)
 }
 
@@ -46,7 +46,7 @@ type handlerProtocolGenerator interface {
 type protocolDispather interface {
 	utilityProtocolGenerator
 	handlerProtocolGenerator
-	onMessage(p protocolHandler, msg *Message)
+	onMessage(p protocolHandler, msg *Message) error
 }
 
 func getEventName(msg *Message) (string, bool) {

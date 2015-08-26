@@ -227,7 +227,10 @@ func (w *Worker) loop() error {
 		case msg, ok := <-w.conn.Read():
 			if ok {
 				// otherwise the connection is closed
-				w.dispatcher.onMessage(w, msg) // non-blocking
+				// non-blocking
+				if err := w.dispatcher.onMessage(w, msg); err != nil {
+					fmt.Printf("onMessage returns %v", err)
+				}
 			}
 
 		case <-w.heartbeatTimer.C:
@@ -298,7 +301,7 @@ func (w *Worker) onError(msg *Message) {
 	}
 }
 
-func (w *Worker) onInvoke(msg *Message) {
+func (w *Worker) onInvoke(msg *Message) error {
 	var (
 		event          string
 		currentSession = msg.Session
@@ -307,7 +310,7 @@ func (w *Worker) onInvoke(msg *Message) {
 	event, ok := getEventName(msg)
 	if !ok {
 		// corrupted message
-		return
+		return fmt.Errorf("unable to get an event name from %s", msg.String())
 	}
 
 	ctx := context.Background()
@@ -318,7 +321,7 @@ func (w *Worker) onInvoke(msg *Message) {
 	handler, ok := w.handlers[event]
 	if !ok {
 		go w.callFallbackHandler(ctx, event, requestStream, responseStream)
-		return
+		return nil
 	}
 
 	go func() {
@@ -328,6 +331,7 @@ func (w *Worker) onInvoke(msg *Message) {
 
 		handler(ctx, requestStream, responseStream)
 	}()
+	return nil
 }
 
 func (w *Worker) onHeartbeat(msg *Message) {
