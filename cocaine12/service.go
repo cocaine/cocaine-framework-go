@@ -123,8 +123,7 @@ CONN_LOOP:
 func NewService(ctx context.Context, name string, endpoints []string) (s *Service, err error) {
 	info, err := serviceResolve(ctx, name, endpoints)
 	if err != nil {
-		err = fmt.Errorf("Unable to resolve service %s", name)
-		return
+		return nil, fmt.Errorf("Unable to resolve service %s: %v", name, err)
 	}
 
 	sock, err := serviceCreateIO(info.Endpoints)
@@ -141,7 +140,7 @@ func NewService(ctx context.Context, name string, endpoints []string) (s *Servic
 		name:        name,
 	}
 	go s.loop()
-	return
+	return s, nil
 }
 
 func (service *Service) loop() {
