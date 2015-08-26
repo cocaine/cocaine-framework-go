@@ -20,7 +20,7 @@ type v1Protocol struct {
 	maxSession uint64
 }
 
-func newV1Protocol() *v1Protocol {
+func newV1Protocol() protocolDispather {
 	return &v1Protocol{
 		maxSession: 1,
 	}
