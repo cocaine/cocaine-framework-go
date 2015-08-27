@@ -137,7 +137,7 @@ func TestWorkerV1(t *testing.T) {
 		Status  int
 		Headers [][2]string
 	}
-	assert.NoError(t, testUnpackHttpChunk(eChunk.Payload, &firstChunk))
+	assert.NoError(t, testUnpackHTTPChunk(eChunk.Payload, &firstChunk))
 	assert.Equal(t, http.StatusProxyAuthRequired, firstChunk.Status, "http: invalid status code")
 	assert.Equal(t, [][2]string{[2]string{"X-Test", "Test"}}, firstChunk.Headers, "http: headers")
 	// body

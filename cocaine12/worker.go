@@ -25,7 +25,8 @@ var (
 	// ErrDisowned raises when the worker doesn't receive
 	// a heartbeat message during a heartbeat timeout
 	ErrDisowned = errors.New("disowned from cocaine-runtime")
-
+	// ErrNoCocaineEndpoint means that the worker doesn't know an endpoint
+	// to Cocaine
 	ErrNoCocaineEndpoint = errors.New("cocaine endpoint must be specified")
 )
 

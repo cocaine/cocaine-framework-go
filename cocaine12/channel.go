@@ -28,7 +28,7 @@ type channel struct {
 
 type rx struct {
 	pushBuffer chan ServiceResult
-	rxTree     *StreamDescription
+	rxTree     *streamDescription
 
 	sync.Mutex
 	queue []ServiceResult
@@ -64,13 +64,13 @@ func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
 	method, _, _ := res.Result()
 	temp := treeMap[method]
 
-	switch temp.StreamDescription {
+	switch temp.streamDescription {
 	case EmptyDescription:
 		rx.done = true
 	case RecursiveDescription:
 		// pass
 	default:
-		rx.rxTree = temp.StreamDescription
+		rx.rxTree = temp.streamDescription
 	}
 
 	// allow to attach various protocols
@@ -108,7 +108,7 @@ func (rx *rx) push(res ServiceResult) {
 
 type tx struct {
 	service *Service
-	txTree  *StreamDescription
+	txTree  *streamDescription
 	id      uint64
 	done    bool
 }
@@ -125,13 +125,13 @@ func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error 
 
 	treeMap := *(tx.txTree)
 	temp := treeMap[method]
-	switch temp.StreamDescription {
+	switch temp.streamDescription {
 	case EmptyDescription:
 		tx.done = true
 	case RecursiveDescription:
 		//pass
 	default:
-		tx.txTree = temp.StreamDescription
+		tx.txTree = temp.streamDescription
 	}
 
 	msg := &Message{

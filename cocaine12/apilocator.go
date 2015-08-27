@@ -6,64 +6,64 @@ func newLocatorServiceInfo() *ServiceInfo {
 	return &ServiceInfo{
 		Endpoints: nil,
 		Version:   1,
-		API: DispatchMap{
-			0: DispatchItem{
+		API: dispatchMap{
+			0: dispatchItem{
 				Name:       "resolve",
 				Downstream: EmptyDescription,
-				Upstream: &StreamDescription{
+				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:              "value",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:              "error",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 				},
 			},
-			1: DispatchItem{
+			1: dispatchItem{
 				Name:       "connect",
 				Downstream: EmptyDescription,
-				Upstream: &StreamDescription{
+				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:              "write",
-						StreamDescription: RecursiveDescription,
+						streamDescription: RecursiveDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:              "error",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 					2: &StreamDescriptionItem{
 						Name:              "close",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 				},
 			},
-			2: DispatchItem{
+			2: dispatchItem{
 				Name:       "refresh",
 				Downstream: EmptyDescription,
-				Upstream: &StreamDescription{
+				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:              "value",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:              "error",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 				},
 			},
-			3: DispatchItem{
+			3: dispatchItem{
 				Name:       "cluster",
 				Downstream: EmptyDescription,
-				Upstream: &StreamDescription{
+				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:              "value",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:              "error",
-						StreamDescription: EmptyDescription,
+						streamDescription: EmptyDescription,
 					},
 				},
 			},

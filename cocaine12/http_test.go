@@ -36,7 +36,7 @@ func packTestReq(req []interface{}) []byte {
 	return out
 }
 
-func testUnpackHttpChunk(payload []interface{}, res interface{}) error {
+func testUnpackHTTPChunk(payload []interface{}, res interface{}) error {
 	return codec.NewDecoderBytes(payload[0].([]byte), hHTTPReq).Decode(res)
 }
 

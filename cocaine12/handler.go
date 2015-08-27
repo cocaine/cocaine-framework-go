@@ -27,7 +27,8 @@ var (
 	ErrTimeout = &TimeoutError{}
 	// ErrBadPayload means that a message payload is malformed
 	ErrBadPayload = errors.New("payload is not []byte")
-	// ErrMalformedErrorMessage
+	// ErrMalformedErrorMessage means that we receive a corrupted or
+	// unproper message
 	ErrMalformedErrorMessage = &ErrRequest{
 		Message:  "malformed error message",
 		Category: cworkererrorcategory,

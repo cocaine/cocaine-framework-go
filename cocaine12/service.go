@@ -11,7 +11,7 @@ import (
 type ServiceInfo struct {
 	Endpoints []EndpointItem
 	Version   uint64
-	API       DispatchMap
+	API       dispatchMap
 }
 
 type ServiceResult interface {

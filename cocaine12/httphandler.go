@@ -74,6 +74,7 @@ func WriteHead(code int, headers Headers) []byte {
 	return out
 }
 
+// HeadersHTTPtoCocaine converts net/http.Header to Cocaine representation
 func HeadersHTTPtoCocaine(header http.Header) Headers {
 	hdr := make(Headers, 0, len(header))
 	for headerName, headerValues := range header {
@@ -84,6 +85,7 @@ func HeadersHTTPtoCocaine(header http.Header) Headers {
 	return hdr
 }
 
+// HeadersCocaineToHTTP converts Cocaine representation of headers to net/http.Header
 func HeadersCocaineToHTTP(hdr Headers) http.Header {
 	header := make(http.Header, len(hdr))
 	for _, hdrValues := range hdr {

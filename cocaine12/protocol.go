@@ -33,17 +33,17 @@ func (e *EndpointItem) String() string {
 	return net.JoinHostPort(e.IP, fmt.Sprintf("%d", e.Port))
 }
 
-type DispatchMap map[uint64]DispatchItem
+type dispatchMap map[uint64]dispatchItem
 
-type DispatchItem struct {
+type dispatchItem struct {
 	Name       string
-	Downstream *StreamDescription
-	Upstream   *StreamDescription
+	Downstream *streamDescription
+	Upstream   *streamDescription
 }
 
-type StreamDescription map[uint64]*StreamDescriptionItem
+type streamDescription map[uint64]*StreamDescriptionItem
 
-func (s *StreamDescription) MethodByName(name string) (uint64, error) {
+func (s *streamDescription) MethodByName(name string) (uint64, error) {
 	for i, v := range *s {
 		if v.Name == name {
 			return i, nil
@@ -55,15 +55,15 @@ func (s *StreamDescription) MethodByName(name string) (uint64, error) {
 
 type StreamDescriptionItem struct {
 	Name string
-	*StreamDescription
+	*streamDescription
 }
 
 var (
-	EmptyDescription     = &StreamDescription{}
-	RecursiveDescription *StreamDescription
+	EmptyDescription     = &streamDescription{}
+	RecursiveDescription *streamDescription
 )
 
-func (d *DispatchMap) Methods() []string {
+func (d *dispatchMap) Methods() []string {
 	var methods = make([]string, 0, len(*d))
 	for _, v := range *d {
 		methods = append(methods, v.Name)
@@ -71,7 +71,7 @@ func (d *DispatchMap) Methods() []string {
 	return methods
 }
 
-func (d *DispatchMap) MethodByName(name string) (uint64, error) {
+func (d *dispatchMap) MethodByName(name string) (uint64, error) {
 	for i, v := range *d {
 		if v.Name == name {
 			return i, nil
