@@ -25,6 +25,8 @@ var (
 	// ErrDisowned raises when the worker doesn't receive
 	// a heartbeat message during a heartbeat timeout
 	ErrDisowned = errors.New("disowned from cocaine-runtime")
+
+	ErrNoCocaineEndpoint = errors.New("cocaine endpoint must be specified")
 )
 
 type requestStream interface {
@@ -111,13 +113,14 @@ func NewWorker() (*Worker, error) {
 
 	unixSocketEndpoint := GetDefaults().Endpoint()
 	if unixSocketEndpoint == "" {
-		return nil, fmt.Errorf("cocaine endpoint must be specified")
+		return nil, ErrNoCocaineEndpoint
 	}
 
 	// Connect to cocaine-runtime over a unix socket
 	sock, err := newUnixConnection(unixSocketEndpoint, coreConnectionTimeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to connect to Cocaine via %s: %v",
+			unixSocketEndpoint, err)
 	}
 
 	return newWorker(sock, workerID, GetDefaults().Protocol(), GetDefaults().Debug())
