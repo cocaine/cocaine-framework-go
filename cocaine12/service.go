@@ -8,6 +8,10 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	ErrDisconnected = -100
+)
+
 type ServiceInfo struct {
 	Endpoints []EndpointItem
 	Version   uint64
@@ -92,6 +96,8 @@ type Service struct {
 
 	args []string
 	name string
+
+	epoch uint
 }
 
 //Creates new service instance with specifed name.
@@ -138,12 +144,15 @@ func NewService(ctx context.Context, name string, endpoints []string) (s *Servic
 		stop:        make(chan struct{}),
 		args:        endpoints,
 		name:        name,
+		epoch:       0,
 	}
 	go s.loop()
 	return s, nil
 }
 
 func (service *Service) loop() {
+	epoch := service.epoch
+
 	for data := range service.socketIO.Read() {
 		if rx, ok := service.sessions.Get(data.Session); ok {
 			rx.push(&serviceRes{
@@ -151,6 +160,12 @@ func (service *Service) loop() {
 				method:  data.MsgType,
 			})
 		}
+	}
+
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	if epoch == service.epoch {
+		service.pushDisconnectedError()
 	}
 }
 
@@ -162,18 +177,7 @@ func (service *Service) Reconnect(ctx context.Context, force bool) error {
 		return nil
 	}
 
-	// Send error to all open sessions
-	for _, key := range service.sessions.Keys() {
-		service.sessions.RLock()
-		if ch, ok := service.sessions.Get(key); ok {
-			ch.push(&serviceRes{
-				payload: nil,
-				method:  1,
-				err:     &ServiceError{-100, "Disconnected"}})
-		}
-		service.sessions.RUnlock()
-		service.sessions.Detach(key)
-	}
+	service.pushDisconnectedError()
 
 	// Create new socket
 	info, err := serviceResolve(ctx, service.name, service.args)
@@ -190,10 +194,25 @@ func (service *Service) Reconnect(ctx context.Context, force bool) error {
 
 	// Reattach channels and network IO
 	service.stop = make(chan struct{})
+	service.epoch++
 	service.socketIO = sock
 	// Start service loop
 	go service.loop()
 	return nil
+}
+
+func (service *Service) pushDisconnectedError() {
+	for _, key := range service.sessions.Keys() {
+		service.sessions.RLock()
+		if ch, ok := service.sessions.Get(key); ok {
+			ch.push(&serviceRes{
+				payload: nil,
+				method:  1,
+				err:     &ServiceError{ErrDisconnected, "Disconnected"}})
+		}
+		service.sessions.RUnlock()
+		service.sessions.Detach(key)
+	}
 }
 
 func (service *Service) call(ctx context.Context, name string, args ...interface{}) (Channel, error) {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
 
@@ -71,4 +72,47 @@ func TestService(t *testing.T) {
 		atomic.LoadUint64(&call),
 		atomic.LoadUint64(&write),
 		atomic.LoadUint64(&first))
+}
+
+func TestDisconnectedError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped without Cocaine")
+	}
+
+	ctx := context.Background()
+
+	s, err := NewService(ctx, "locator", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// passing wrong arguments leads to disconnect
+	ch, err := s.Call(ctx, "resolve", 1, 2, 3, 4, 5, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ch.Get(ctx)
+	assert.EqualError(t, err, "Disconnected")
+}
+
+func TestTimeoutError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped without Cocaine")
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), time.Millisecond*5)
+	s, err := NewService(ctx, "locator", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// passing wrong arguments leads to disconnect
+	ch, err := s.Call(ctx, "resolve", "locator")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ch.Get(ctx)
+	assert.EqualError(t, err, ctx.Err().Error())
 }
