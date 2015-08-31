@@ -57,7 +57,11 @@ func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
 		}
 		rx.Unlock()
 
-		res = <-rx.pushBuffer
+		select {
+		case res = <-rx.pushBuffer:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	treeMap := *(rx.rxTree)
