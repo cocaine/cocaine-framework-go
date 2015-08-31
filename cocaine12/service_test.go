@@ -96,6 +96,32 @@ func TestDisconnectedError(t *testing.T) {
 	assert.EqualError(t, err, "Disconnected")
 }
 
+func TestReconnection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped without Cocaine")
+	}
+
+	ctx := context.Background()
+
+	s, err := NewService(ctx, "locator", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// passing wrong arguments leads to disconnect
+	ch, err := s.Call(ctx, "resolve", 1, 2, 3, 4, 5, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ch.Get(ctx)
+	assert.EqualError(t, err, "Disconnected")
+
+	_, err = s.Call(ctx, "resolve", 1, 2, 3, 4, 5, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestTimeoutError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipped without Cocaine")

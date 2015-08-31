@@ -257,8 +257,6 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 }
 
 func (service *Service) disconnected() bool {
-	service.mutex.RLock()
-	defer service.mutex.RUnlock()
 	select {
 	case <-service.IsClosed():
 		return true
@@ -275,7 +273,11 @@ func (service *Service) sendMsg(msg *Message) {
 
 //Calls a remote method by name and pass args
 func (service *Service) Call(ctx context.Context, name string, args ...interface{}) (Channel, error) {
-	if service.disconnected() {
+	service.mutex.RLock()
+	disconnected := service.disconnected()
+	service.mutex.RUnlock()
+
+	if disconnected {
 		if err := service.Reconnect(ctx, false); err != nil {
 			return nil, err
 		}
