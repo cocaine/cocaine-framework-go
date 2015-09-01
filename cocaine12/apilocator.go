@@ -1,8 +1,8 @@
 package cocaine12
 
 var (
-	EmptyDescription     = &streamDescription{}
-	RecursiveDescription *streamDescription
+	emptyDescription     = &streamDescription{}
+	recursiveDescription *streamDescription
 )
 
 func newLocatorServiceInfo() *ServiceInfo {
@@ -12,61 +12,61 @@ func newLocatorServiceInfo() *ServiceInfo {
 		API: dispatchMap{
 			0: dispatchItem{
 				Name:       "resolve",
-				Downstream: EmptyDescription,
+				Downstream: emptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:        "value",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:        "error",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 				},
 			},
 			1: dispatchItem{
 				Name:       "connect",
-				Downstream: EmptyDescription,
+				Downstream: emptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:        "write",
-						Description: RecursiveDescription,
+						Description: recursiveDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:        "error",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 					2: &StreamDescriptionItem{
 						Name:        "close",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 				},
 			},
 			2: dispatchItem{
 				Name:       "refresh",
-				Downstream: EmptyDescription,
+				Downstream: emptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:        "value",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:        "error",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 				},
 			},
 			3: dispatchItem{
 				Name:       "cluster",
-				Downstream: EmptyDescription,
+				Downstream: emptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
 						Name:        "value",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 					1: &StreamDescriptionItem{
 						Name:        "error",
-						Description: EmptyDescription,
+						Description: emptyDescription,
 					},
 				},
 			},

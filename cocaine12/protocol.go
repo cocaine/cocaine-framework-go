@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// CommonMessageInfo consists of a session number and a message type
 type CommonMessageInfo struct {
 	// Session id
 	Session uint64

@@ -46,6 +46,8 @@ func (d *defaultValues) UUID() string {
 	return d.uuid
 }
 
+// DefaultValues provides an interface to read
+//various information provided by Cocaine-Runtime to the worker
 type DefaultValues interface {
 	ApplicationName() string
 	Debug() bool
@@ -64,6 +66,7 @@ var (
 	}
 )
 
+// GetDefaults returns DefaultValues
 func GetDefaults() DefaultValues {
 	// lazy init
 	initDefaultValues.Do(parseDefaultValues)

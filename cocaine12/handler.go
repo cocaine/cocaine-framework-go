@@ -22,9 +22,7 @@ const (
 
 var (
 	// ErrStreamIsClosed means that a response stream is closed
-	ErrStreamIsClosed = &ClosedError{}
-	// ErrTimeout means that a request is timeouted
-	ErrTimeout = &TimeoutError{}
+	ErrStreamIsClosed = errors.New("Stream is closed")
 	// ErrBadPayload means that a message payload is malformed
 	ErrBadPayload = errors.New("payload is not []byte")
 	// ErrMalformedErrorMessage means that we receive a corrupted or
@@ -35,22 +33,6 @@ var (
 		Code:     cdefaulterrrorcode,
 	}
 )
-
-type TimeoutError struct{}
-
-func (t *TimeoutError) Error() string { return "TimeoutError" }
-
-type ClosedError struct{}
-
-func (t *ClosedError) Error() string { return "Stream is closed" }
-
-func IsTimeout(err error) bool {
-	switch err.(type) {
-	case *TimeoutError:
-		return true
-	}
-	return false
-}
 
 func newRequest(mtd messageTypeDetector) *request {
 	request := &request{
@@ -109,7 +91,7 @@ func (request *request) Read(ctx context.Context) ([]byte, error) {
 			Code:     perr.CodeInfo[1],
 		}
 	case <-ctx.Done():
-		return nil, ErrTimeout
+		return nil, ctx.Err()
 	}
 }
 

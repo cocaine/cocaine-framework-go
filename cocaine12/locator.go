@@ -6,6 +6,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Locator is used to Resolve new services. It should be closed
+// after last usage
 type Locator interface {
 	Resolve(ctx context.Context, name string) (*ServiceInfo, error)
 	Close()
@@ -15,6 +17,7 @@ type locator struct {
 	*Service
 }
 
+// NewLocator creates a new Locator using given endpoints
 func NewLocator(endpoints []string) (Locator, error) {
 	if len(endpoints) == 0 {
 		endpoints = append(endpoints, GetDefaults().Locators()...)

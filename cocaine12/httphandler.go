@@ -132,7 +132,7 @@ func WrapHandler(handler http.Handler) EventHandler {
 		// They are packed by msgpack
 		msg, err := request.Read(ctx)
 		if err != nil {
-			if IsTimeout(err) {
+			if ctx.Err() != nil {
 				response.Write(WriteHead(http.StatusRequestTimeout, Headers{}))
 				response.Write([]byte("request was not received during a timeout"))
 				return
