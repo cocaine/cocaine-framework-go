@@ -87,7 +87,7 @@ func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 		// They are packed by msgpack
 		msg, err := request.Read(ctx)
 		if err != nil {
-			if cocaine.IsTimeout(err) {
+			if ctx.Err() != nil {
 				response.Write(cocaine.WriteHead(http.StatusRequestTimeout, cocaine.Headers{}))
 				response.Write([]byte("request was not received during a timeout"))
 				return
