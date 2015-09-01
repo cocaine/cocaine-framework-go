@@ -11,7 +11,7 @@ func Example() {
 	var handler cocaine.EventHandler // check type
 
 	handler = func(ctx context.Context, req cocaine.Request, resp cocaine.Response) {
-		inp, _ := req.Read()
+		inp, _ := req.Read(ctx)
 
 		resp.Write(inp)
 		resp.ErrorMsg(100, "testerrormessage")
