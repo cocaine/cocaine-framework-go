@@ -1,6 +1,9 @@
 package cocaine12
 
-// ToDo: this file should be generated from c++
+var (
+	EmptyDescription     = &streamDescription{}
+	RecursiveDescription *streamDescription
+)
 
 func newLocatorServiceInfo() *ServiceInfo {
 	return &ServiceInfo{
@@ -12,12 +15,12 @@ func newLocatorServiceInfo() *ServiceInfo {
 				Downstream: EmptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
-						Name:              "value",
-						streamDescription: EmptyDescription,
+						Name:        "value",
+						Description: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
-						Name:              "error",
-						streamDescription: EmptyDescription,
+						Name:        "error",
+						Description: EmptyDescription,
 					},
 				},
 			},
@@ -26,16 +29,16 @@ func newLocatorServiceInfo() *ServiceInfo {
 				Downstream: EmptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
-						Name:              "write",
-						streamDescription: RecursiveDescription,
+						Name:        "write",
+						Description: RecursiveDescription,
 					},
 					1: &StreamDescriptionItem{
-						Name:              "error",
-						streamDescription: EmptyDescription,
+						Name:        "error",
+						Description: EmptyDescription,
 					},
 					2: &StreamDescriptionItem{
-						Name:              "close",
-						streamDescription: EmptyDescription,
+						Name:        "close",
+						Description: EmptyDescription,
 					},
 				},
 			},
@@ -44,12 +47,12 @@ func newLocatorServiceInfo() *ServiceInfo {
 				Downstream: EmptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
-						Name:              "value",
-						streamDescription: EmptyDescription,
+						Name:        "value",
+						Description: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
-						Name:              "error",
-						streamDescription: EmptyDescription,
+						Name:        "error",
+						Description: EmptyDescription,
 					},
 				},
 			},
@@ -58,12 +61,12 @@ func newLocatorServiceInfo() *ServiceInfo {
 				Downstream: EmptyDescription,
 				Upstream: &streamDescription{
 					0: &StreamDescriptionItem{
-						Name:              "value",
-						streamDescription: EmptyDescription,
+						Name:        "value",
+						Description: EmptyDescription,
 					},
 					1: &StreamDescriptionItem{
-						Name:              "error",
-						streamDescription: EmptyDescription,
+						Name:        "error",
+						Description: EmptyDescription,
 					},
 				},
 			},

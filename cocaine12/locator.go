@@ -6,11 +6,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-// type ResolveChannelResult struct {
-// 	*ServiceInfo
-// 	Err error
-// }
-
 type Locator interface {
 	Resolve(ctx context.Context, name string) (*ServiceInfo, error)
 	Close()

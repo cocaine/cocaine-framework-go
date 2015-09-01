@@ -127,12 +127,13 @@ func TestTimeoutError(t *testing.T) {
 		t.Skip("skipped without Cocaine")
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Millisecond*5)
+	ctx := context.Background()
 	s, err := NewService(ctx, "locator", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	ctx, _ = context.WithTimeout(context.Background(), time.Microsecond*5)
 	// passing wrong arguments leads to disconnect
 	ch, err := s.Call(ctx, "resolve", "locator")
 	if err != nil {
@@ -140,5 +141,37 @@ func TestTimeoutError(t *testing.T) {
 	}
 
 	_, err = ch.Get(ctx)
+	if !assert.Error(t, ctx.Err()) {
+		t.FailNow()
+	}
 	assert.EqualError(t, err, ctx.Err().Error())
+}
+
+func TestRxClosedGet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped without Cocaine")
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
+	s, err := NewService(ctx, "locator", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, v := range s.ServiceInfo.API {
+		t.Logf("%s %v %v\n", v.Name, v.Downstream, v.Upstream)
+		for k, j := range *v.Upstream {
+			t.Logf("%v %v\n", k, j)
+		}
+	}
+
+	// passing wrong arguments leads to disconnect
+	ch, err := s.Call(ctx, "connect", "abcdefg")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ch.Get(ctx)
+	_, err = ch.Get(ctx)
+	assert.EqualError(t, err, ErrStreamIsClosed.Error())
 }

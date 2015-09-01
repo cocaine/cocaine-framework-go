@@ -68,13 +68,13 @@ func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
 	method, _, _ := res.Result()
 	temp := treeMap[method]
 
-	switch temp.streamDescription {
-	case EmptyDescription:
+	switch temp.Description.Type() {
+	case emptyDispatch:
 		rx.done = true
-	case RecursiveDescription:
+	case recursiveDispatch:
 		// pass
-	default:
-		rx.rxTree = temp.streamDescription
+	case otherDispatch:
+		rx.rxTree = temp.Description
 	}
 
 	// allow to attach various protocols
@@ -129,13 +129,16 @@ func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error 
 
 	treeMap := *(tx.txTree)
 	temp := treeMap[method]
-	switch temp.streamDescription {
-	case EmptyDescription:
+
+	switch temp.Description.Type() {
+	case emptyDispatch:
 		tx.done = true
-	case RecursiveDescription:
+
+	case recursiveDispatch:
 		//pass
-	default:
-		tx.txTree = temp.streamDescription
+
+	case otherDispatch:
+		tx.txTree = temp.Description
 	}
 
 	msg := &Message{
