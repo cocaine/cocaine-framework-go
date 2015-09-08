@@ -3,7 +3,9 @@ package cocaine12
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -244,6 +246,89 @@ func TestWorkerV1Termination(t *testing.T) {
 	case <-onStop:
 		// a termination exit
 	case <-time.After(disownTimeout):
+		t.Fatalf("unexpected exit")
+	}
+}
+
+func TestWorkerLoad(t *testing.T) {
+	const (
+		testID = "uuid"
+		limit  = 10240
+	)
+
+	var (
+		onStop = make(chan struct{})
+	)
+
+	in, out := testConn()
+	sock, _ := newAsyncRW(out)
+	sock2, _ := newAsyncRW(in)
+	w, err := newWorker(sock, testID, 1, true)
+	if err != nil {
+		t.Fatal("unable to create worker", err)
+	}
+
+	w.On("echo", func(ctx context.Context, req Request, res Response) {
+		defer res.Close()
+		req.Read(ctx)
+		time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+		res.Write([]byte("DONE"))
+	})
+
+	go func() {
+		w.Run(map[string]EventHandler{})
+	}()
+
+	j := 0
+	sessions := 0
+	go func() {
+		for {
+			select {
+			case msg := <-sock2.Read():
+				switch {
+				case msg == nil:
+					t.Log(j)
+					t.FailNow()
+				case msg.Session == v1UtilitySession:
+					sock2.Write() <- newHeartbeatV1()
+				default:
+					j++
+					if msg.MsgType == v1Close {
+						sessions++
+						if sessions == limit-1 {
+							w.Stop()
+							t.Log("Done")
+							close(onStop)
+							return
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	i := uint64(1)
+
+	for k := 0; k < 5; k++ {
+		func() {
+			for {
+				val := atomic.AddUint64(&i, 1)
+				if val > limit {
+					return
+				}
+				sock2.Write() <- newInvokeV1(val, "echo")
+				sock2.Write() <- newChunkV1(val, []byte("Dummy"))
+				sock2.Write() <- newChokeV1(val)
+
+			}
+		}()
+	}
+
+	select {
+	case <-onStop:
+		// a termination exit
+		t.Logf("messages %d, sessions %d, limit %d\n", j, sessions, limit-1)
+	case <-time.After(time.Second * 100):
 		t.Fatalf("unexpected exit")
 	}
 }
