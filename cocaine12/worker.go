@@ -28,6 +28,9 @@ var (
 	// ErrNoCocaineEndpoint means that the worker doesn't know an endpoint
 	// to Cocaine
 	ErrNoCocaineEndpoint = errors.New("cocaine endpoint must be specified")
+	// ErrConenctionLost means that the connection between the worker and
+	// runtime has been lost
+	ErrConenctionLost = errors.New("the connection to runtime has been lost")
 )
 
 type requestStream interface {
@@ -229,12 +232,20 @@ func (w *Worker) loop() error {
 	for {
 		select {
 		case msg, ok := <-w.conn.Read():
-			if ok {
-				// otherwise the connection is closed
-				// non-blocking
-				if err := w.dispatcher.onMessage(w, msg); err != nil {
-					fmt.Printf("onMessage returns %v", err)
+			if !ok {
+				// either the connection is lost
+				// or the worker was stopped
+				select {
+				case <-w.stopped:
+					return nil
+				default:
+					return ErrConenctionLost
 				}
+			}
+
+			// non-blocking
+			if err := w.dispatcher.onMessage(w, msg); err != nil {
+				fmt.Printf("onMessage returns %v", err)
 			}
 
 		case <-w.heartbeatTimer.C:

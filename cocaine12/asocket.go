@@ -234,7 +234,7 @@ func (sock *asyncRWSocket) Send(msg *Message) {
 	select {
 	case sock.Write() <- msg:
 	case <-sock.IsClosed():
-		// Socket is in a closed state,
+		// Socket is in the closed state,
 		// so drop the data
 	}
 }
