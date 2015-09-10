@@ -28,9 +28,9 @@ var (
 	// ErrNoCocaineEndpoint means that the worker doesn't know an endpoint
 	// to Cocaine
 	ErrNoCocaineEndpoint = errors.New("cocaine endpoint must be specified")
-	// ErrConnenctionLost means that the connection between the worker and
+	// ErrConnectionLost means that the connection between the worker and
 	// runtime has been lost
-	ErrConnenctionLost = errors.New("the connection to runtime has been lost")
+	ErrConnectionLost = errors.New("the connection to runtime has been lost")
 )
 
 type requestStream interface {
@@ -239,7 +239,7 @@ func (w *Worker) loop() error {
 				case <-w.stopped:
 					return nil
 				default:
-					return ErrConnenctionLost
+					return ErrConnectionLost
 				}
 			}
 
