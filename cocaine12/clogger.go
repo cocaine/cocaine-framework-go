@@ -42,6 +42,7 @@ func newCocaineLogger(ctx context.Context, name string, endpoints ...string) (Lo
 		severity: -100,
 		prefix:   fmt.Sprintf("app/%s", GetDefaults().ApplicationName()),
 	}
+
 	return logger, nil
 }
 
@@ -111,33 +112,49 @@ func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...i
 }
 
 func (c *cocaineLogger) Debug(args ...interface{}) {
-	c.log(DebugLevel, defaultFields, fmt.Sprint(args...))
+	if c.V(DebugLevel) {
+		c.log(DebugLevel, defaultFields, fmt.Sprint(args...))
+	}
 }
 
 func (c *cocaineLogger) Debugf(msg string, args ...interface{}) {
-	c.log(DebugLevel, defaultFields, msg, args...)
+	if c.V(DebugLevel) {
+		c.log(DebugLevel, defaultFields, msg, args...)
+	}
 }
 
 func (c *cocaineLogger) Info(args ...interface{}) {
-	c.log(InfoLevel, defaultFields, fmt.Sprint(args...))
+	if c.V(InfoLevel) {
+		c.log(InfoLevel, defaultFields, fmt.Sprint(args...))
+	}
 }
 
 func (c *cocaineLogger) Infof(msg string, args ...interface{}) {
-	c.log(InfoLevel, defaultFields, msg, args...)
+	if c.V(InfoLevel) {
+		c.log(InfoLevel, defaultFields, msg, args...)
+	}
 }
 
 func (c *cocaineLogger) Warn(args ...interface{}) {
-	c.log(WarnLevel, defaultFields, fmt.Sprint(args...))
+	if c.V(WarnLevel) {
+		c.log(WarnLevel, defaultFields, fmt.Sprint(args...))
+	}
 }
 
 func (c *cocaineLogger) Warnf(msg string, args ...interface{}) {
-	c.log(WarnLevel, defaultFields, msg, args...)
+	if c.V(WarnLevel) {
+		c.log(WarnLevel, defaultFields, msg, args...)
+	}
 }
 
 func (c *cocaineLogger) Err(args ...interface{}) {
-	c.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
+	if c.V(ErrorLevel) {
+		c.log(ErrorLevel, defaultFields, fmt.Sprint(args...))
+	}
 }
 
 func (c *cocaineLogger) Errf(msg string, args ...interface{}) {
-	c.log(ErrorLevel, defaultFields, msg, args...)
+	if c.V(ErrorLevel) {
+		c.log(ErrorLevel, defaultFields, msg, args...)
+	}
 }
