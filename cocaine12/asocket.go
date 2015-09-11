@@ -242,7 +242,8 @@ func (sock *asyncRWSocket) Send(msg *Message) {
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
-		encoder := codec.NewEncoder(sock.conn, hAsocket)
+		var buf = bufio.NewWriter(sock.conn)
+		encoder := codec.NewEncoder(buf, hAsocket)
 		for incoming := range sock.upstreamBuf.out {
 			err := encoder.Encode(incoming)
 			if err != nil {
@@ -255,6 +256,7 @@ func (sock *asyncRWSocket) writeloop() {
 				}()
 				return
 			}
+			buf.Flush()
 		}
 	}()
 }
