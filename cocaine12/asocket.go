@@ -1,6 +1,7 @@
 package cocaine12
 
 import (
+	"bufio"
 	"io"
 	"net"
 	"sync"
@@ -260,7 +261,7 @@ func (sock *asyncRWSocket) writeloop() {
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		decoder := codec.NewDecoder(sock.conn, hAsocket)
+		decoder := codec.NewDecoder(bufio.NewReader(sock.conn), hAsocket)
 		for {
 			var message *Message
 			err := decoder.Decode(&message)
