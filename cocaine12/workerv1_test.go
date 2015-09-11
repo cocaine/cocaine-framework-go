@@ -157,8 +157,6 @@ func TestWorkerV1(t *testing.T) {
 
 	eError := <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+2, v1Error)
-	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+2, v1Close)
 
 	// badevent
 	t.Log("badevent event")
@@ -168,8 +166,6 @@ func TestWorkerV1(t *testing.T) {
 
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+3, v1Error)
-	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+3, v1Close)
 
 	// panic
 	t.Log("panic event")
@@ -179,8 +175,7 @@ func TestWorkerV1(t *testing.T) {
 
 	eError = <-sock2.Read()
 	checkTypeAndSession(t, eError, testSession+4, v1Error)
-	eChoke = <-sock2.Read()
-	checkTypeAndSession(t, eChoke, testSession+4, v1Close)
+
 	<-onStop
 	w.Stop()
 }

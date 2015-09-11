@@ -138,7 +138,7 @@ func (r *response) Close() error {
 		return syscall.EINVAL
 	}
 
-	r.closed = true
+	r.close()
 	r.toWorker.Send(r.newChoke(r.session))
 	return nil
 }
@@ -149,6 +149,7 @@ func (r *response) ErrorMsg(code int, message string) error {
 		return io.ErrClosedPipe
 	}
 
+	r.close()
 	r.toWorker.Send(r.newError(
 		// current session number
 		r.session,
@@ -159,8 +160,11 @@ func (r *response) ErrorMsg(code int, message string) error {
 		// error message
 		message,
 	))
+	return nil
+}
 
-	return r.Close()
+func (r *response) close() {
+	r.closed = true
 }
 
 func (r *response) isClosed() bool {
