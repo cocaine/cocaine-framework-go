@@ -14,6 +14,7 @@ const (
 	heartbeatTimeout      = time.Second * 10
 	disownTimeout         = time.Second * 5
 	coreConnectionTimeout = time.Second * 5
+	terminationTimeout    = time.Second * 5
 
 	// ErrorNoEventHandler returns when there is no handler for a given event
 	ErrorNoEventHandler = 200
@@ -58,6 +59,9 @@ type EventHandler func(context.Context, Request, Response)
 // FallbackEventHandler handles an event if there is no other handler
 // for the given event
 type FallbackEventHandler func(context.Context, string, Request, Response)
+
+// TerminationHandler invokes when termination message is received
+type TerminationHandler func(context.Context)
 
 // DefaultFallbackEventHandler sends an error message if a client requests
 // unhandled event
@@ -109,6 +113,8 @@ type Worker struct {
 	protoVersion int
 	// protocol dispatcher
 	dispatcher protocolDispather
+	// temination handler
+	terminationHandler TerminationHandler
 }
 
 // NewWorker connects to the cocaine-runtime and create Worker on top of this connection
@@ -143,10 +149,11 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 
 		stopped: make(chan struct{}),
 
-		fallbackHandler: DefaultFallbackEventHandler,
-		debug:           debug,
-		protoVersion:    protoVersion,
-		dispatcher:      nil,
+		fallbackHandler:    DefaultFallbackEventHandler,
+		debug:              debug,
+		protoVersion:       protoVersion,
+		dispatcher:         nil,
+		terminationHandler: nil,
 	}
 
 	switch w.protoVersion {
@@ -193,6 +200,10 @@ func (w *Worker) callFallbackHandler(ctx context.Context, event string, request 
 // It allows to print Stack of a paniced handler
 func (w *Worker) SetDebug(debug bool) {
 	w.debug = debug
+}
+
+func (w *Worker) SetTerminationHandler(handler TerminationHandler) {
+	w.terminationHandler = handler
 }
 
 // Run makes the worker anounce itself to a cocaine-runtime
@@ -357,7 +368,30 @@ func (w *Worker) onHeartbeat(msg *Message) {
 }
 
 func (w *Worker) onTerminate(msg *Message) {
+	if w.terminationHandler != nil {
+		ctx, cancelTimeout := context.WithTimeout(context.Background(), terminationTimeout)
+		onDone := make(chan struct{})
+		go func() {
+			w.terminationHandler(ctx)
+			close(onDone)
+		}()
+
+		select {
+		case <-onDone:
+			cancelTimeout()
+		case <-ctx.Done():
+			fmt.Printf("terminationHandler timeouted: %v\n", ctx.Err())
+		}
+
+	}
+
 	// According to spec we have time
 	// to prepare for being killed by cocaine-runtime
+	select {
+	case w.conn.Write() <- msg:
+		// reply with the same termination message
+	case <-w.conn.IsClosed():
+	case <-time.After(disownTimeout):
+	}
 	w.Stop()
 }
