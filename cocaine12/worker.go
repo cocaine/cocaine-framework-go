@@ -75,7 +75,9 @@ func trapRecoverAndClose(ctx context.Context, event string, response Response, p
 		var stack []byte
 
 		if printStack {
-			runtime.Stack(stack, false)
+			stack = make([]byte, 4096)
+			stackSize := runtime.Stack(stack, false)
+			stack = stack[:stackSize]
 		}
 
 		response.ErrorMsg(
