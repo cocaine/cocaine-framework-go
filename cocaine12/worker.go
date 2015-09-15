@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime/debug"
+	"runtime"
 	"time"
 
 	"golang.org/x/net/context"
@@ -75,12 +75,12 @@ func trapRecoverAndClose(ctx context.Context, event string, response Response, p
 		var stack []byte
 
 		if printStack {
-			stack = debug.Stack()
+			runtime.Stack(stack, false)
 		}
 
 		response.ErrorMsg(
 			ErrorPanicInHandler,
-			fmt.Sprintf("Event: '%s', recover: %s, stack: %s", event, recoverInfo, stack),
+			fmt.Sprintf("Event: '%s', recover: %s, stack: \n%s\n", event, recoverInfo, stack),
 		)
 		return
 	}
