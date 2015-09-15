@@ -4,7 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
 	"golang.org/x/net/context"
@@ -111,6 +115,8 @@ type Worker struct {
 	fallbackHandler FallbackEventHandler
 	// if set recoverTrap sends Stack
 	debug bool
+	// allow the worker to handle SIGUSR1 to print all goroutines stacks
+	stackSignalEnabled bool
 	// protocol version id
 	protoVersion int
 	// protocol dispatcher
@@ -135,7 +141,9 @@ func NewWorker() (*Worker, error) {
 			unixSocketEndpoint, err)
 	}
 
-	return newWorker(sock, workerID, GetDefaults().Protocol(), GetDefaults().Debug())
+	return newWorker(sock, workerID,
+		GetDefaults().Protocol(),
+		GetDefaults().Debug())
 }
 
 func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
@@ -151,8 +159,11 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 
 		stopped: make(chan struct{}),
 
-		fallbackHandler:    DefaultFallbackEventHandler,
+		fallbackHandler: DefaultFallbackEventHandler,
+
 		debug:              debug,
+		stackSignalEnabled: true,
+
 		protoVersion:       protoVersion,
 		dispatcher:         nil,
 		terminationHandler: nil,
@@ -204,6 +215,13 @@ func (w *Worker) SetDebug(debug bool) {
 	w.debug = debug
 }
 
+// EnableStackSignal allows/disallows the worker to catch
+// SIGUSR1 to print all goroutines stacks. It's enabled by default.
+// This function must be called before Worker.Run to take effect.
+func (w *Worker) EnableStackSignal(enable bool) {
+	w.stackSignalEnabled = enable
+}
+
 func (w *Worker) SetTerminationHandler(handler TerminationHandler) {
 	w.terminationHandler = handler
 }
@@ -242,6 +260,14 @@ func (w *Worker) loop() error {
 	// we are ready to work
 	w.onHeartbeatTimeout()
 
+	var stackSignal chan os.Signal
+
+	if w.stackSignalEnabled {
+		stackSignal = make(chan os.Signal, 1)
+		signal.Notify(stackSignal, syscall.SIGUSR1)
+		defer signal.Stop(stackSignal)
+	}
+
 	for {
 		select {
 		case msg, ok := <-w.conn.Read():
@@ -272,7 +298,22 @@ func (w *Worker) loop() error {
 
 		case <-w.stopped:
 			return nil
+
+		case <-stackSignal:
+			w.printAllStacks()
 		}
+	}
+}
+
+// printAllStacks prints all stacks to stderr and writes to a file
+func (w *Worker) printAllStacks() {
+	stackTrace := dumpStack()
+	// print to stdout to have it in the logs
+	fmt.Printf("=== START STACKTRACE ===\n%s\n=== END STACKTRACE ===", stackTrace)
+	// to debug blocked workers. It will be removed somewhen
+	filename := fmt.Sprintf("%s-%d", GetDefaults().ApplicationName(), os.Getpid())
+	if err := ioutil.WriteFile(filename, stackTrace, 0660); err != nil {
+		fmt.Println("unable to create the file with stacktraces %s: %v", filename, err)
 	}
 }
 
@@ -384,7 +425,6 @@ func (w *Worker) onTerminate(msg *Message) {
 		case <-ctx.Done():
 			fmt.Printf("terminationHandler timeouted: %v\n", ctx.Err())
 		}
-
 	}
 
 	// According to spec we have time
