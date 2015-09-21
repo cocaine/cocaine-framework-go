@@ -267,7 +267,7 @@ func (service *Service) disconnected() bool {
 
 func (service *Service) sendMsg(msg *Message) {
 	service.mutex.RLock()
-	service.socketIO.Write() <- msg
+	service.socketIO.Send(msg)
 	service.mutex.RUnlock()
 }
 
