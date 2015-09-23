@@ -142,10 +142,8 @@ func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error 
 	}
 
 	msg := &Message{
-		CommonMessageInfo{
-			tx.id,
-			method},
-		args,
+		CommonMessageInfo: CommonMessageInfo{tx.id, method},
+		Payload:           args,
 	}
 
 	tx.service.sendMsg(msg)

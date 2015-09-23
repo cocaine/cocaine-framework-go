@@ -246,10 +246,8 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	ch.tx.id = service.sessions.Attach(&ch)
 
 	msg := &Message{
-		CommonMessageInfo{
-			ch.tx.id,
-			methodNum},
-		args,
+		CommonMessageInfo: CommonMessageInfo{ch.tx.id, methodNum},
+		Payload:           args,
 	}
 
 	service.sendMsg(msg)

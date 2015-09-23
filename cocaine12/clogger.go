@@ -100,10 +100,8 @@ func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...i
 	}
 
 	loggermsg := &Message{
-		CommonMessageInfo{
-			c.Service.sessions.Next(),
-			loggerEmit},
-		methodArgs,
+		CommonMessageInfo: CommonMessageInfo{c.Service.sessions.Next(), loggerEmit},
+		Payload:           methodArgs,
 	}
 
 	c.mu.Lock()
