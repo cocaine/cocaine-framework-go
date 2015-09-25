@@ -371,18 +371,23 @@ func (w *Worker) onError(msg *Message) {
 }
 
 func (w *Worker) onInvoke(msg *Message) error {
-	var (
-		event          string
-		currentSession = msg.Session
-	)
-
 	event, ok := getEventName(msg)
 	if !ok {
 		// corrupted message
 		return fmt.Errorf("unable to get an event name from %s", msg.String())
 	}
 
-	ctx := context.Background()
+	var (
+		currentSession = msg.Session
+		ctx            context.Context
+	)
+
+	if traceInfo, err := msg.Headers.getTraceData(); err != nil {
+		ctx = context.Background()
+	} else {
+		ctx = NewTracedContext(traceInfo)
+	}
+
 	responseStream := newResponse(w.dispatcher, currentSession, w.conn)
 	requestStream := newRequest(w.dispatcher)
 	w.sessions[currentSession] = requestStream

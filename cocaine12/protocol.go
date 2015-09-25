@@ -28,6 +28,8 @@ var (
 	ErrInvalidTraceType      = errors.New("invalid trace header number type")
 	ErrInvalidTraceNumber    = errors.New("invalid trace header number")
 	ErrInvalidTraceValueType = errors.New("invalid trace value type")
+
+	ErrNotAllTracesPresent = errors.New("not all trace values present")
 )
 
 // CommonMessageInfo consists of a session number and a message type
@@ -64,9 +66,9 @@ func getTrace(header interface{}) (uint64, []byte, error) {
 			traceNum = uint64(num)
 		case uint64:
 			traceNum = num
-		case int64:
-			traceNum = uint64(num)
 		case int32:
+			traceNum = uint64(num)
+		case int64:
 			traceNum = uint64(num)
 		default:
 			return 0, nil, ErrInvalidTraceType
@@ -94,6 +96,43 @@ func getTrace(header interface{}) (uint64, []byte, error) {
 }
 
 type CocaineHeaders []interface{}
+
+func (h CocaineHeaders) getTraceData() (traceInfo TraceInfo, err error) {
+	var i = 0
+	for _, header := range h {
+		number, buffer, _ := getTrace(header)
+		switch number {
+		case traceId:
+			if traceInfo.trace, err = decodeTracingId(buffer); err != nil {
+				return
+			}
+
+		case spanId:
+			if traceInfo.span, err = decodeTracingId(buffer); err != nil {
+				return
+			}
+
+		case parentId:
+			if buffer == nil {
+				traceInfo.parent = 0
+			} else {
+				if traceInfo.parent, err = decodeTracingId(buffer); err != nil {
+					return
+				}
+			}
+
+		default:
+			continue
+		}
+
+		i++
+		if i == 3 {
+			return
+		}
+	}
+
+	return traceInfo, ErrNotAllTracesPresent
+}
 
 func decodeTracingId(b []byte) (uint64, error) {
 	var tracingId uint64
