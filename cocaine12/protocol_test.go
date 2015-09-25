@@ -69,3 +69,61 @@ func TestAPIUnpack(t *testing.T) {
 	}
 
 }
+
+//'[]byte{148,1,0,147,161,65,161,66,161,67,147,147,194,80,168,124,0,0,0,0,0,0,0,147,194,81,168,159,134,1,0,0,0,0,0,82}'
+func TestMessageUnpack(t *testing.T) {
+	// Payload is packed by Python:
+	// traceid = 124
+	// parentid = 0
+	// spanid=999999
+	// [(False, 80, '|\x00\x00\x00\x00\x00\x00\x00'),
+	// (False, 81, '\x9f\x86\x01\x00\x00\x00\x00\x00'),
+	// 82]
+	// [1, 0, ["A", "B", "C"], z]
+	payload := []byte{148, 100, 101, 147, 161, 65, 161, 66, 161, 67, 147, 147, 194, 80,
+		168, 124, 0, 0, 0, 0, 0, 0, 0, 147, 194, 81, 168, 159, 134, 1, 0, 0, 0, 0, 0, 82}
+	decoder := codec.NewDecoder(bytes.NewReader(payload), hAsocket)
+
+	var message Message
+	decoder.MustDecode(&message)
+
+	assert.Equal(t, uint64(100), message.Session)
+	assert.Equal(t, uint64(101), message.MsgType)
+	headers := message.Headers
+	assert.Equal(t, 3, len(headers))
+}
+
+func TestHeaders(t *testing.T) {
+	var (
+		buff    []byte
+		headers CocaineHeaders
+	)
+	codec.NewEncoderBytes(&buff, hAsocket).MustEncode(
+		[]interface{}{
+			[]interface{}{false, 80, "dsfdfd"},
+			82,
+			[]interface{}{true, 81, "fdfdfd"},
+		})
+	codec.NewDecoderBytes(buff, hAsocket).MustDecode(&headers)
+
+	assert.Equal(t, 3, len(headers))
+	for i, header := range headers {
+		switch i {
+		case 0:
+			n, v, err := getTrace(header)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(traceId), n)
+			assert.Equal(t, []byte("dsfdfd"), v)
+		case 1:
+			n, v, err := getTrace(header)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(parentId), n)
+			assert.Equal(t, []byte(nil), v)
+		case 2:
+			n, v, err := getTrace(header)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(spanId), n)
+			assert.Equal(t, []byte("fdfdfd"), v)
+		}
+	}
+}

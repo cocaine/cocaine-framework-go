@@ -284,7 +284,7 @@ func (w *Worker) loop() error {
 
 			// non-blocking
 			if err := w.dispatcher.onMessage(w, msg); err != nil {
-				fmt.Printf("onMessage returns %v", err)
+				fmt.Printf("onMessage returns %v\n", err)
 			}
 
 		case <-w.heartbeatTimer.C:

@@ -100,7 +100,10 @@ func TestWorkerV1(t *testing.T) {
 	sock2.Write() <- newChokeV1(testSession)
 
 	// handshake
-	eHandshake := <-sock2.Read()
+	eHandshake, ok := <-sock2.Read()
+	if eHandshake == nil {
+		t.Fatalf("Corrupted message %s %v", eHandshake, ok)
+	}
 	checkTypeAndSession(t, eHandshake, v1UtilitySession, v1Handshake)
 
 	switch uuid := eHandshake.Payload[0].(type) {
@@ -200,7 +203,10 @@ func TestWorkerV1Termination(t *testing.T) {
 		close(onStop)
 	}()
 
-	eHandshake := <-sock2.Read()
+	eHandshake, ok := <-sock2.Read()
+	if eHandshake == nil {
+		t.Fatalf("Corrupted message %s %v", eHandshake, ok)
+	}
 	checkTypeAndSession(t, eHandshake, v1UtilitySession, v1Handshake)
 	eHeartbeat := <-sock2.Read()
 	checkTypeAndSession(t, eHeartbeat, v1UtilitySession, v1Heartbeat)
