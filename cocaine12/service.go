@@ -248,6 +248,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	msg := &Message{
 		CommonMessageInfo: CommonMessageInfo{ch.tx.id, methodNum},
 		Payload:           args,
+		Headers:           []interface{}{},
 	}
 
 	service.sendMsg(msg)
