@@ -36,18 +36,25 @@ type traced struct {
 	startTime time.Time
 }
 
-func BeginNewTraceContext() context.Context {
+// It might be used in client applications.
+func BeginNewTraceContext(ctx context.Context) context.Context {
 	ts := uint64(rand.Int63())
-	return NewTracedContext(TraceInfo{
+	return AttachTraceInfo(ctx, TraceInfo{
 		trace:  ts,
 		span:   ts,
 		parent: 0,
 	})
 }
 
-func NewTracedContext(traceInfo TraceInfo) context.Context {
+// AttachTraceInfo binds given TraceInfo to the context.
+// If ctx is nil, then TraceInfo will be attached to context.Background()
+func AttachTraceInfo(ctx context.Context, traceInfo TraceInfo) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	return &traced{
-		Context:   context.Background(),
+		Context:   ctx,
 		traceInfo: traceInfo,
 		startTime: time.Now(),
 	}

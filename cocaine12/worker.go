@@ -382,10 +382,10 @@ func (w *Worker) onInvoke(msg *Message) error {
 		ctx            context.Context
 	)
 
-	if traceInfo, err := msg.Headers.getTraceData(); err != nil {
-		ctx = context.Background()
-	} else {
-		ctx = NewTracedContext(traceInfo)
+	ctx = context.Background()
+
+	if traceInfo, err := msg.Headers.getTraceData(); err == nil {
+		ctx = AttachTraceInfo(ctx, traceInfo)
 	}
 
 	responseStream := newResponse(w.dispatcher, currentSession, w.conn)
