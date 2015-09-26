@@ -9,6 +9,11 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	TraceInfoValue      = "trace.traceinfo"
+	TraceStartTimeValue = "trace.starttime"
+)
+
 var (
 	initTraceLogger sync.Once
 	traceLogger     Logger
@@ -60,11 +65,17 @@ func AttachTraceInfo(ctx context.Context, traceInfo TraceInfo) context.Context {
 	}
 }
 
+// CleanTraceInfo might be used to clear context instance from trace info
+// to disable tracing in some RPC calls to get rid of overhead
+func CleanTraceInfo(ctx context.Context) context.Context {
+	return context.WithValue(ctx, TraceInfoValue, nil)
+}
+
 func (t *traced) Value(key interface{}) interface{} {
 	switch key {
-	case "trace.traceinfo":
+	case TraceInfoValue:
 		return t.traceInfo
-	case "traced.start":
+	case TraceStartTimeValue:
 		return t.startTime
 	default:
 		return t.Context.Value(key)
@@ -72,7 +83,7 @@ func (t *traced) Value(key interface{}) interface{} {
 }
 
 func getTraceInfo(ctx context.Context) *TraceInfo {
-	if val, ok := ctx.Value("trace.traceinfo").(TraceInfo); ok {
+	if val, ok := ctx.Value(TraceInfoValue).(TraceInfo); ok {
 		return &val
 	}
 	return nil
