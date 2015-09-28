@@ -173,8 +173,8 @@ func (msg *chunk) getPayload() []interface{} {
 func unpackErrorMsg(session int64, data []interface{}) (msg messageInterface, err error) {
 	var code int
 	var message string
-	if code_t, ok := data[0].(int); ok {
-		code = code_t
+	if code_t, ok := data[0].(int64); ok {
+		code = int(code_t)
 	}
 	if message_t, ok := data[1].([]byte); ok {
 		message = string(message_t)
