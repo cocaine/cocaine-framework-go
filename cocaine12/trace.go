@@ -118,10 +118,11 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 
 	var rpcName string
 	if len(args) > 0 {
-		rpcName = fmt.Sprintf(rpcName, args...)
+		rpcName = fmt.Sprintf(rpcNameFormat, args...)
 	} else {
 		rpcName = rpcNameFormat
 	}
+
 	// startTime is not used only to log the start of an RPC
 	// It's stored in Context to calculate the RPC call duration.
 	// A user can get it via Context.Value(TraceStartTimeValue)
