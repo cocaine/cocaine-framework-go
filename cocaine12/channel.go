@@ -22,8 +22,23 @@ type Tx interface {
 }
 
 type channel struct {
+	// we call when data frame arrives
+	traceReceived CloseSpan
+	// we call when data is sent
+	traceSent CloseSpan
+
 	rx
 	tx
+}
+
+func (ch *channel) push(res ServiceResult) {
+	ch.traceReceived()
+	ch.rx.push(res)
+}
+
+func (ch *channel) Call(ctx context.Context, name string, args ...interface{}) error {
+	ch.traceSent()
+	return ch.tx.Call(ctx, name, args...)
 }
 
 type rx struct {
@@ -115,6 +130,8 @@ type tx struct {
 	txTree  *streamDescription
 	id      uint64
 	done    bool
+
+	headers CocaineHeaders
 }
 
 func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error {
@@ -144,6 +161,7 @@ func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error 
 	msg := &Message{
 		CommonMessageInfo: CommonMessageInfo{tx.id, method},
 		Payload:           args,
+		Headers:           tx.headers,
 	}
 
 	tx.service.sendMsg(msg)

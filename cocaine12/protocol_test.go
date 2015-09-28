@@ -140,6 +140,29 @@ func TestHeaders(t *testing.T) {
 	assert.Equal(t, uint64(8000), traceInfo.parent)
 }
 
+func TestHeadersPackUnpack(t *testing.T) {
+	trace := TraceInfo{
+		trace:  uint64(100),
+		span:   uint64(200),
+		parent: uint64(300),
+	}
+
+	headers, err := traceInfoToHeaders(&trace)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(headers))
+	// t.Logf("%v", headers)
+
+	traceInfo, err := headers.getTraceData()
+	if !assert.NoError(t, err) {
+		t.Logf("%v", traceInfo)
+		t.FailNow()
+	}
+
+	assert.Equal(t, trace.trace, traceInfo.trace)
+	assert.Equal(t, trace.span, traceInfo.span)
+	assert.Equal(t, trace.parent, traceInfo.parent)
+}
+
 func BenchmarkTraceExtract(b *testing.B) {
 	var (
 		//trace.pack_trace(trace.Trace(traceid=9000, spanid=11000, parentid=8000))

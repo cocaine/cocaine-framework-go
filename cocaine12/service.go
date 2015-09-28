@@ -2,6 +2,7 @@ package cocaine12
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -98,6 +99,7 @@ type Service struct {
 	name string
 
 	epoch uint
+	id    string
 }
 
 //Creates new service instance with specifed name.
@@ -145,6 +147,7 @@ func NewService(ctx context.Context, name string, endpoints []string) (s *Servic
 		args:        endpoints,
 		name:        name,
 		epoch:       0,
+		id:          fmt.Sprintf("%x", rand.Int63()),
 	}
 	go s.loop()
 	return s, nil
@@ -172,6 +175,9 @@ func (service *Service) loop() {
 func (service *Service) Reconnect(ctx context.Context, force bool) error {
 	service.mutex.Lock()
 	defer service.mutex.Unlock()
+
+	ctx, closeReconnectionSpan := NewSpan(ctx, "%s %s reconnection", service.name, service.id)
+	defer closeReconnectionSpan()
 
 	if !force && !service.disconnected() {
 		return nil
@@ -219,12 +225,58 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	service.mutex.RLock()
 	defer service.mutex.RUnlock()
 
+	ctx, traceCall := NewSpan(ctx, "%s %s: calling %s", service.name, service.id, name)
+
 	methodNum, err := service.API.MethodByName(name)
 	if err != nil {
+		traceCall()
 		return nil, err
 	}
 
+	var (
+		headers           = CocaineHeaders{}
+		traceSentCall     = closeDummySpan
+		traceReceivedCall = closeDummySpan
+	)
+
+	if traceInfo := getTraceInfo(ctx); traceInfo != nil {
+
+		// eval it once here, to reuse later in traceReceived/Sent
+		RPCName := fmt.Sprintf("%s %s: calling %s", service.name, service.id, name)
+		traceHex := fmt.Sprintf("%x", traceInfo.trace)
+		spanHex := fmt.Sprintf("%x", traceInfo.span)
+		parentHex := fmt.Sprintf("%x", traceInfo.parent)
+
+		var err error
+		headers, err = traceInfoToHeaders(traceInfo)
+		if err != nil {
+			traceLog().Err("unable to pack trace info into headers")
+		}
+
+		traceSentCall = func() {
+			traceLog().WithFields(Fields{
+				"trace_id":       traceHex,
+				"span_id":        spanHex,
+				"parent_id":      parentHex,
+				"real_timestamp": time.Now().UnixNano() / 1000,
+				"RPC":            RPCName,
+			}).Infof("trace sent")
+		}
+
+		traceReceivedCall = func() {
+			traceLog().WithFields(Fields{
+				"trace_id":       traceHex,
+				"span_id":        spanHex,
+				"parent_id":      parentHex,
+				"real_timestamp": time.Now().UnixNano() / 1000,
+				"RPC":            RPCName,
+			}).Infof("trace received")
+		}
+	}
+
 	ch := channel{
+		traceReceived: traceReceivedCall,
+		traceSent:     traceSentCall,
 		rx: rx{
 			pushBuffer: make(chan ServiceResult, 1),
 			rxTree:     service.ServiceInfo.API[methodNum].Upstream,
@@ -235,6 +287,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 			txTree:  service.ServiceInfo.API[methodNum].Downstream,
 			id:      0,
 			done:    false,
+			headers: headers,
 		},
 	}
 
@@ -248,7 +301,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	msg := &Message{
 		CommonMessageInfo: CommonMessageInfo{ch.tx.id, methodNum},
 		Payload:           args,
-		Headers:           []interface{}{},
+		Headers:           headers,
 	}
 
 	service.sendMsg(msg)
