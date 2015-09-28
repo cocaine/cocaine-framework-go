@@ -10,7 +10,7 @@ import (
 func Echo(ctx context.Context, req cocaine12.Request, resp cocaine12.Response) {
 	defer resp.Close()
 
-	ctx, done := cocaine12.WithTrace(ctx, "echo")
+	ctx, done := cocaine12.NewSpan(ctx, "echo")
 	defer done("Echo has finished")
 
 	body, err := req.Read(ctx)

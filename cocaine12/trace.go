@@ -97,11 +97,11 @@ func CleanTraceInfo(ctx context.Context) context.Context {
 	return context.WithValue(ctx, TraceInfoValue, nil)
 }
 
-// WithTrace starts new span and returns a context with attached TraceInfo and Done.
+// NewSpan starts new span and returns a context with attached TraceInfo and Done.
 // If ctx is nil or has no TraceInfo new span won't start to support sampling,
 // so it's user responsibility to make sure that the context has TraceInfo.
 // Anyway it safe to call CloseSpan function even in this case, it actually does nothing.
-func WithTrace(ctx context.Context, rpcName string) (context.Context, func(format string, args ...interface{})) {
+func NewSpan(ctx context.Context, rpcName string) (context.Context, func(format string, args ...interface{})) {
 	if ctx == nil {
 		// I'm not sure it is a valid action.
 		// According to the rule "no trace info, no new span"
