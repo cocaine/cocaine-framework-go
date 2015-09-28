@@ -3,6 +3,7 @@ package cocaine12
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -104,6 +105,7 @@ func newDeafults(args []string, setname string) *defaultValues {
 	values.debug = strings.ToUpper(os.Getenv("DEBUG")) == "DEBUG"
 
 	flagSet := flag.NewFlagSet(setname, flag.ContinueOnError)
+	flagSet.SetOutput(ioutil.Discard)
 	flagSet.StringVar(&values.appName, "app", "gostandalone", "application name")
 	flagSet.StringVar(&values.endpoint, "endpoint", "", "unix socket path to connect to the Cocaine")
 	flagSet.Var(&values.locators, "locator", "default endpoints of locators")
