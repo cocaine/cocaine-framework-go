@@ -17,6 +17,8 @@ const (
 var (
 	initTraceLogger sync.Once
 	traceLogger     Logger
+
+	closeDummySpan CloseSpan = func() {}
 )
 
 func traceLog() Logger {
@@ -40,11 +42,7 @@ func getTraceInfo(ctx context.Context) *TraceInfo {
 
 // CloseSpan closes attached span. It should be call after
 // the rpc ends.
-type CloseSpan func(format string, args ...interface{})
-
-var (
-	closeDummySpan CloseSpan = func(format string, args ...interface{}) {}
-)
+type CloseSpan func()
 
 type TraceInfo struct {
 	trace, span, parent uint64
@@ -101,7 +99,7 @@ func CleanTraceInfo(ctx context.Context) context.Context {
 // If ctx is nil or has no TraceInfo new span won't start to support sampling,
 // so it's user responsibility to make sure that the context has TraceInfo.
 // Anyway it safe to call CloseSpan function even in this case, it actually does nothing.
-func NewSpan(ctx context.Context, rpcName string) (context.Context, func(format string, args ...interface{})) {
+func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (context.Context, CloseSpan) {
 	if ctx == nil {
 		// I'm not sure it is a valid action.
 		// According to the rule "no trace info, no new span"
@@ -118,6 +116,12 @@ func NewSpan(ctx context.Context, rpcName string) (context.Context, func(format 
 		return ctx, closeDummySpan
 	}
 
+	var rpcName string
+	if len(args) > 0 {
+		rpcName = fmt.Sprintf(rpcName, args...)
+	} else {
+		rpcName = rpcNameFormat
+	}
 	// startTime is not used only to log the start of an RPC
 	// It's stored in Context to calculate the RPC call duration.
 	// A user can get it via Context.Value(TraceStartTimeValue)
@@ -144,7 +148,7 @@ func NewSpan(ctx context.Context, rpcName string) (context.Context, func(format 
 		startTime: startTime,
 	}
 
-	return ctx, func(format string, args ...interface{}) {
+	return ctx, func() {
 		now := time.Now()
 		duration := now.Sub(startTime)
 		traceLog().WithFields(Fields{
@@ -154,6 +158,6 @@ func NewSpan(ctx context.Context, rpcName string) (context.Context, func(format 
 			"timestamp": now.UnixNano(),
 			"duration":  duration.Nanoseconds() / 1000,
 			"RPC":       rpcName,
-		}).Infof(format, args...)
+		}).Infof("finish")
 	}
 }

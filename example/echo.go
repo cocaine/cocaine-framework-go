@@ -11,7 +11,7 @@ func Echo(ctx context.Context, req cocaine12.Request, resp cocaine12.Response) {
 	defer resp.Close()
 
 	ctx, done := cocaine12.NewSpan(ctx, "echo")
-	defer done("Echo has finished")
+	defer done()
 
 	body, err := req.Read(ctx)
 	if err != nil {
