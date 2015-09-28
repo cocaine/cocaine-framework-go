@@ -403,6 +403,9 @@ func (w *Worker) onInvoke(msg *Message) error {
 		// and checks if the response is closed.
 		defer trapRecoverAndClose(ctx, event, responseStream, w.debug)
 
+		ctx, closeHandlerSpan := NewSpan(ctx, event)
+		defer closeHandlerSpan()
+
 		handler(ctx, requestStream, responseStream)
 	}()
 	return nil
