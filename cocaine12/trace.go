@@ -135,11 +135,11 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 	traceInfo.span = uint64(rand.Int63())
 
 	traceLog().WithFields(Fields{
-		"trace_id":  fmt.Sprintf("%x", traceInfo.trace),
-		"span_id":   fmt.Sprintf("%x", traceInfo.span),
-		"parent_id": fmt.Sprintf("%x", traceInfo.parent),
-		"timestamp": startTime.UnixNano() / 1000,
-		"RPC":       rpcName,
+		"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
+		"span_id":        fmt.Sprintf("%x", traceInfo.span),
+		"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
+		"real_timestamp": startTime.UnixNano() / 1000,
+		"RPC":            rpcName,
 	}).Infof("start")
 
 	ctx = &traced{
@@ -152,12 +152,12 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 		now := time.Now()
 		duration := now.Sub(startTime)
 		traceLog().WithFields(Fields{
-			"trace_id":  fmt.Sprintf("%x", traceInfo.trace),
-			"span_id":   fmt.Sprintf("%x", traceInfo.span),
-			"parent_id": fmt.Sprintf("%x", traceInfo.parent),
-			"timestamp": now.UnixNano() / 1000,
-			"duration":  duration.Nanoseconds() / 1000,
-			"RPC":       rpcName,
+			"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
+			"span_id":        fmt.Sprintf("%x", traceInfo.span),
+			"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
+			"real_timestamp": now.UnixNano() / 1000,
+			"duration":       duration.Nanoseconds() / 1000,
+			"RPC":            rpcName,
 		}).Infof("finish")
 	}
 }
