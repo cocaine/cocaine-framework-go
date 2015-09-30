@@ -3,6 +3,7 @@ package cocaine
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime/debug"
 	"time"
@@ -19,10 +20,14 @@ var (
 )
 
 func init() {
-	flag.StringVar(&flagUUID, "uuid", "", "UUID")
-	flag.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
-	flag.StringVar(&flagApp, "app", "standalone", "Connection path")
-	flag.StringVar(&flagLocator, "locator", "localhost:10053", "Connection path")
+	flagSet := flag.NewFlagSet("cocaine11", flag.ContinueOnError)
+	flagSet.SetOutput(ioutil.Discard)
+
+	flagSet.StringVar(&flagUUID, "uuid", "", "UUID")
+	flagSet.StringVar(&flagEndpoint, "endpoint", "", "Connection path")
+	flagSet.StringVar(&flagApp, "app", "standalone", "Connection path")
+	flagSet.StringVar(&flagLocator, "locator", "localhost:10053", "Connection path")
+	flagSet.Parse(os.Args[1:])
 }
 
 const (
