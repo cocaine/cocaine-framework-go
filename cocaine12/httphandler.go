@@ -127,35 +127,9 @@ func WrapHandler(handler http.Handler) EventHandler {
 	var wrapper = func(ctx context.Context, request Request, response Response) {
 		defer response.Close()
 
-		// Read the first chunk
-		// It consists of method, uri, httpversion, headers, body.
-		// They are packed by msgpack
-		msg, err := request.Read(ctx)
+		w, httpRequest, err := convertToHTTPFunc(ctx, request, response)
 		if err != nil {
-			if ctx.Err() != nil {
-				response.Write(WriteHead(http.StatusRequestTimeout, Headers{}))
-				response.Write([]byte("request was not received during a timeout"))
-				return
-			}
-
-			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
-			response.Write([]byte("cannot process request " + err.Error()))
 			return
-		}
-
-		httpRequest, err := UnpackProxyRequest(msg)
-		if err != nil {
-			response.Write(WriteHead(http.StatusBadRequest, Headers{}))
-			response.Write([]byte("malformed request"))
-			return
-		}
-
-		w := &ResponseWriter{
-			cRes:          response,
-			req:           httpRequest,
-			handlerHeader: make(http.Header),
-			contentLength: -1,
-			wroteHeader:   false,
 		}
 
 		handler.ServeHTTP(w, httpRequest)
@@ -163,6 +137,64 @@ func WrapHandler(handler http.Handler) EventHandler {
 	}
 
 	return wrapper
+}
+
+func WrapHTTPFunc(handler func(ctx context.Context, w http.ResponseWriter, req *http.Request)) EventHandler {
+	return func(ctx context.Context, request Request, response Response) {
+		defer response.Close()
+
+		w, httpRequest, err := convertToHTTPFunc(ctx, request, response)
+		if err != nil {
+			return
+		}
+
+		handler(ctx, w, httpRequest)
+		w.finishRequest()
+	}
+}
+
+func WrapHTTPFuncs(hfs map[string]func(ctx context.Context, w http.ResponseWriter, req *http.Request)) map[string]EventHandler {
+	handlers := make(map[string]EventHandler, len(hfs))
+	for key, hf := range hfs {
+		handlers[key] = WrapHTTPFunc(hf)
+	}
+
+	return handlers
+}
+
+func convertToHTTPFunc(ctx context.Context, request Request, response Response) (*ResponseWriter, *http.Request, error) {
+	// Read the first chunk
+	// It consists of method, uri, httpversion, headers, body.
+	// They are packed by msgpack
+	msg, err := request.Read(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			response.Write(WriteHead(http.StatusRequestTimeout, Headers{}))
+			response.Write([]byte("request was not received during a timeout"))
+			return nil, nil, ctx.Err()
+		}
+
+		response.Write(WriteHead(http.StatusBadRequest, Headers{}))
+		response.Write([]byte("cannot process request " + err.Error()))
+		return nil, nil, err
+	}
+
+	httpRequest, err := UnpackProxyRequest(msg)
+	if err != nil {
+		response.Write(WriteHead(http.StatusBadRequest, Headers{}))
+		response.Write([]byte("malformed request"))
+		return nil, nil, err
+	}
+
+	w := &ResponseWriter{
+		cRes:          response,
+		req:           httpRequest,
+		handlerHeader: make(http.Header),
+		contentLength: -1,
+		wroteHeader:   false,
+	}
+
+	return w, httpRequest, nil
 }
 
 // WrapHandlerFunc provides opportunity for using Go web frameworks, which supports http.HandlerFunc interface
