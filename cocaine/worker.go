@@ -156,7 +156,6 @@ type Worker struct {
 
 // Creates new instance of Worker. Returns error on fail.
 func NewWorker() (worker *Worker, err error) {
-	flag.Parse()
 	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
 	if err != nil {
 		return

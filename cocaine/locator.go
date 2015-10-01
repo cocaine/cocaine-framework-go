@@ -2,7 +2,6 @@ package cocaine
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -43,9 +42,6 @@ type Locator struct {
 }
 
 func NewLocator(args ...interface{}) (*Locator, error) {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
 	endpoint := flagLocator
 
 	if len(args) == 1 {
