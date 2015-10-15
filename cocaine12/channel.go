@@ -14,6 +14,7 @@ type Channel interface {
 
 type Rx interface {
 	Get(context.Context) (ServiceResult, error)
+	Closed() bool
 	push(ServiceResult)
 }
 
@@ -51,7 +52,7 @@ type rx struct {
 }
 
 func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
-	if rx.done {
+	if rx.Closed() {
 		return nil, ErrStreamIsClosed
 	}
 
@@ -112,6 +113,10 @@ func (rx *rx) Get(ctx context.Context) (ServiceResult, error) {
 	}
 
 	return res, nil
+}
+
+func (rx *rx) Closed() bool {
+	return rx.done
 }
 
 func (rx *rx) push(res ServiceResult) {
