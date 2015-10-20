@@ -166,7 +166,7 @@ func TestRxClosedGet(t *testing.T) {
 	}
 
 	// passing wrong arguments leads to disconnect
-	ch, err := s.Call(ctx, "connect", "abcdefg")
+	ch, err := s.Call(ctx, "connect", 1111)
 	if err != nil {
 		t.Fatal(err)
 	}
