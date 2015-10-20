@@ -222,6 +222,8 @@ func (w *Worker) EnableStackSignal(enable bool) {
 	w.stackSignalEnabled = enable
 }
 
+// SetTerminationHandler allows to attach handler which will be called
+// when SIGTERM arrives
 func (w *Worker) SetTerminationHandler(handler TerminationHandler) {
 	w.terminationHandler = handler
 }
@@ -313,7 +315,7 @@ func (w *Worker) printAllStacks() {
 	// to debug blocked workers. It will be removed somewhen
 	filename := fmt.Sprintf("%s-%d", GetDefaults().ApplicationName(), os.Getpid())
 	if err := ioutil.WriteFile(filename, stackTrace, 0660); err != nil {
-		fmt.Println("unable to create the file with stacktraces %s: %v", filename, err)
+		fmt.Printf("unable to create the file with stacktraces %s: %v\n", filename, err)
 	}
 }
 
