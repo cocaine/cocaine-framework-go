@@ -140,7 +140,7 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 		"span_id":        fmt.Sprintf("%x", traceInfo.span),
 		"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
 		"real_timestamp": startTime.UnixNano() / 1000,
-		"RPC":            rpcName,
+		"rpc_name":       rpcName,
 	}).Infof("start")
 
 	ctx = &traced{
@@ -158,7 +158,7 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 			"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
 			"real_timestamp": now.UnixNano() / 1000,
 			"duration":       duration.Nanoseconds() / 1000,
-			"RPC":            rpcName,
+			"rpc_name":       rpcName,
 		}).Infof("finish")
 	}
 }
