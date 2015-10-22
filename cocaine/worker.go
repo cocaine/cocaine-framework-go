@@ -141,6 +141,13 @@ func (response *Response) ErrorMsg(code int, msg string) {
 	response.from_handler <- packMsg(&errorMsg{messageInfo{ERROR, response.session}, code, msg})
 }
 
+type FallbackHandler func(string, *Request, *Response)
+
+var defaultFallbackHandler = func(event string, req *Request, resp *Response) {
+	defer resp.Close()
+	resp.ErrorMsg(-100, fmt.Sprintf("There is no event handler for %s", event))
+}
+
 // Performs IO operations between application
 // and cocaine-runtime, dispatches incoming messages from runtime.
 type Worker struct {
@@ -152,6 +159,8 @@ type Worker struct {
 	sessions        map[int64](*Request)
 	from_handlers   chan rawMessage
 	socketIO
+
+	fallback FallbackHandler
 }
 
 // Creates new instance of Worker. Returns error on fail.
@@ -177,12 +186,17 @@ func NewWorker() (worker *Worker, err error) {
 		sessions:        make(map[int64](*Request)),
 		from_handlers:   make(chan rawMessage),
 		socketIO:        sock,
+		fallback:        defaultFallbackHandler,
 	}
 	w.disown_timer.Stop()
 	w.handshake()
 	w.heartbeat()
 	worker = &w
 	return
+}
+
+func (worker *Worker) SetFallbackHandler(fallback FallbackHandler) {
+	worker.fallback = fallback
 }
 
 // Initializes worker in runtime as starting. Launchs an eventloop.
@@ -222,10 +236,14 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 							callback(req, resp)
 						}()
 					} else {
-						errMsg := fmt.Sprintf("There is no event handler for %s", msg.Event)
-						worker.logger.Debug(errMsg)
-						resp.ErrorMsg(-100, errMsg)
-						resp.Close()
+						go func() {
+							defer func() {
+								if r := recover(); r != nil {
+									resp.Close()
+								}
+							}()
+							worker.fallback(msg.Event, req, resp)
+						}()
 					}
 
 				case *heartbeat:
