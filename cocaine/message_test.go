@@ -23,8 +23,8 @@ func TestMessageUnpackErrorMsg(t *testing.T) {
 	msg, err := unpackMessage(result)
 	assert.NoError(t, err)
 
-	assert.Equal(t, session, msg.getSessionID(), "bad session")
-	if !assert.Equal(t, _type, msg.getTypeID(), "bad message type") {
+	assert.Equal(t, int64(session), msg.getSessionID(), "bad session")
+	if !assert.Equal(t, int64(_type), msg.getTypeID(), "bad message type") {
 		t.FailNow()
 	}
 

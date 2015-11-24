@@ -3,7 +3,6 @@ package cocaine
 import (
 	"bytes"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -191,20 +190,19 @@ type readerAndCloser struct {
 
 // If body is compressed it will be decompressed
 // Currently only gzip supported
-func decompressBody(req *http.Request) (err error) {
+func decompressBody(req *http.Request) error {
 	if req.ContentLength > 0 && req.Header.Get("Content-Encoding") == "gzip" {
-		gzReader, zerr := gzip.NewReader(req.Body)
-		if zerr == nil {
-			req.Header.Del("Content-Encoding")
-			req.Header.Del("Content-Length")
-			req.ContentLength = -1
-			req.Body = readerAndCloser{gzReader, decompressReaderCloser{gzReader, req.Body}}
-		} else {
-			gzReader.Close()
+		gzReader, err := gzip.NewReader(req.Body)
+		if err != nil {
 			req.Body.Close()
-			err = errors.New(fmt.Sprintf("Could not decompress gzip body due to error %v", zerr))
+			return fmt.Errorf("Could not decompress gzip body due to error %v", err)
 		}
+
+		req.Header.Del("Content-Encoding")
+		req.Header.Del("Content-Length")
+		req.ContentLength = -1
+		req.Body = readerAndCloser{gzReader, decompressReaderCloser{gzReader, req.Body}}
 	}
 
-	return
+	return nil
 }
