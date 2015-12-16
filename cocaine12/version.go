@@ -1,5 +1,5 @@
 package cocaine12
 
 const (
-	frameworkVersion = "0.12.4.3"
+	frameworkVersion = "0.12.4.4"
 )
