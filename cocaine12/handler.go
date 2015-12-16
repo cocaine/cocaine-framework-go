@@ -127,7 +127,10 @@ func (r *response) Write(data []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	r.toWorker.Send(r.newChunk(r.session, data))
+	// According to io.Writer spec
+	// I must not retain provided []byte
+	var cpy = append([]byte(nil), data...)
+	r.toWorker.Send(r.newChunk(r.session, cpy))
 	return len(data), nil
 }
 

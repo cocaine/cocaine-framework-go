@@ -70,22 +70,21 @@ func (w *ResponseWriter) bodyAllowed() bool {
 
 // Write writes the data to the connection as part of an HTTP reply
 func (w *ResponseWriter) Write(data []byte) (n int, err error) {
-	// fmt.Printf("%s\n", data)
-	return w.write(len(data), data)
+	return w.write(data)
 }
 
 // WriteString writes the string to the connection as part of an HTTP reply
 func (w *ResponseWriter) WriteString(data string) (n int, err error) {
-	return w.write(len(data), []byte(data))
+	return w.write([]byte(data))
 }
 
 // either dataB or dataS is non-zero.
-func (w *ResponseWriter) write(lenData int, data []byte) (n int, err error) {
+func (w *ResponseWriter) write(data []byte) (n int, err error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	if lenData == 0 {
+	if len(data) == 0 {
 		return 0, nil
 	}
 
@@ -93,7 +92,7 @@ func (w *ResponseWriter) write(lenData int, data []byte) (n int, err error) {
 		return 0, http.ErrBodyNotAllowed
 	}
 
-	w.written += int64(lenData) // ignoring errors, for errorKludge
+	w.written += int64(len(data)) // ignoring errors, for errorKludge
 	if w.contentLength != -1 && w.written > w.contentLength {
 		return 0, http.ErrContentLength
 	}
