@@ -121,17 +121,28 @@ func newResponse(h handlerProtocolGenerator, session uint64, toWorker asyncSende
 	return response
 }
 
-// Sends chunk of data to a client.
+// Write sends chunk of data to a client.
+// It copies data to follow io.Writer rule about not retaining a buffer
 func (r *response) Write(data []byte) (n int, err error) {
-	if r.isClosed() {
-		return 0, io.ErrClosedPipe
-	}
-
 	// According to io.Writer spec
 	// I must not retain provided []byte
 	var cpy = append([]byte(nil), data...)
-	r.toWorker.Send(r.newChunk(r.session, cpy))
+	if err := r.ZeroCopyWrite(cpy); err != nil {
+		return 0, err
+	}
+
 	return len(data), nil
+}
+
+// ZeroCopyWrite sends data to a client.
+// Response takes the ownership of the buffer, so provided buffer must not be edited.
+func (r *response) ZeroCopyWrite(data []byte) error {
+	if r.isClosed() {
+		return io.ErrClosedPipe
+	}
+
+	r.toWorker.Send(r.newChunk(r.session, data))
+	return nil
 }
 
 // Notify a client about finishing the datastream.

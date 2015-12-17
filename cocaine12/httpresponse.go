@@ -42,7 +42,7 @@ func (w *ResponseWriter) WriteHeader(code int) {
 		}
 	}
 
-	w.cRes.Write(
+	w.cRes.ZeroCopyWrite(
 		WriteHead(code, HeadersHTTPtoCocaine(w.handlerHeader)),
 	)
 }
@@ -70,16 +70,17 @@ func (w *ResponseWriter) bodyAllowed() bool {
 
 // Write writes the data to the connection as part of an HTTP reply
 func (w *ResponseWriter) Write(data []byte) (n int, err error) {
-	return w.write(data)
+	return w.write(data, true)
 }
 
 // WriteString writes the string to the connection as part of an HTTP reply
 func (w *ResponseWriter) WriteString(data string) (n int, err error) {
-	return w.write([]byte(data))
+	// Converting from string to []byte copied the underlying buffer,
+	// so write can avoid copying.
+	return w.write([]byte(data), false)
 }
 
-// either dataB or dataS is non-zero.
-func (w *ResponseWriter) write(data []byte) (n int, err error) {
+func (w *ResponseWriter) write(data []byte, shouldCopy bool) (n int, err error) {
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
@@ -97,6 +98,11 @@ func (w *ResponseWriter) write(data []byte) (n int, err error) {
 		return 0, http.ErrContentLength
 	}
 
-	w.cRes.Write(data)
+	if shouldCopy {
+		w.cRes.Write(data)
+	} else {
+		w.cRes.ZeroCopyWrite(data)
+	}
+
 	return len(data), nil
 }

@@ -38,6 +38,11 @@ func (r *Response) Close() error {
 	return nil
 }
 
+func (r *Response) ZeroCopyWrite(data []byte) error {
+	_, err := r.Buffer.Write(data)
+	return err
+}
+
 func (r *Response) ErrorMsg(code int, msg string) error {
 	if r.closed {
 		return io.ErrClosedPipe
