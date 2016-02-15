@@ -99,13 +99,14 @@ func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...i
 		methodArgs = []interface{}{level, c.prefix, msg, formatFields(fields)}
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	loggermsg := &Message{
 		CommonMessageInfo: CommonMessageInfo{c.Service.sessions.Next(), loggerEmit},
 		Payload:           methodArgs,
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.Service.sendMsg(loggermsg)
 }
 
