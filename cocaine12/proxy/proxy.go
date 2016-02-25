@@ -9,7 +9,7 @@ import (
 	"time"
 
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
-	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
+	"github.com/ugorji/go/codec"
 	"golang.org/x/net/context"
 )
 

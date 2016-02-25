@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
+	"github.com/ugorji/go/codec"
 	uuid "github.com/satori/go.uuid"
 )
 
