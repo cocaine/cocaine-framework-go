@@ -148,6 +148,12 @@ var defaultFallbackHandler = func(event string, req *Request, resp *Response) {
 	resp.ErrorMsg(-100, fmt.Sprintf("There is no event handler for %s", event))
 }
 
+type DisownHandler func()
+
+var defaultDisownHandler = func() {
+	os.Exit(0)
+}
+
 // Performs IO operations between application
 // and cocaine-runtime, dispatches incoming messages from runtime.
 type Worker struct {
@@ -161,6 +167,7 @@ type Worker struct {
 	socketIO
 
 	fallback FallbackHandler
+	disown          DisownHandler
 }
 
 // Creates new instance of Worker. Returns error on fail.
@@ -187,6 +194,7 @@ func NewWorker() (worker *Worker, err error) {
 		from_handlers:   make(chan rawMessage),
 		socketIO:        sock,
 		fallback:        defaultFallbackHandler,
+		disown:          defaultDisownHandler,
 	}
 	w.disown_timer.Stop()
 	w.handshake()
@@ -197,6 +205,10 @@ func NewWorker() (worker *Worker, err error) {
 
 func (worker *Worker) SetFallbackHandler(fallback FallbackHandler) {
 	worker.fallback = fallback
+}
+
+func (worker *Worker) SetDisownHandler(disown DisownHandler) {
+	worker.disown = disown
 }
 
 // Initializes worker in runtime as starting. Launchs an eventloop.
@@ -264,7 +276,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 
 		case <-worker.disown_timer.C:
 			worker.logger.Info("Disowned")
-			os.Exit(0)
+			worker.disown()
 
 		case outcoming := <-worker.from_handlers:
 			worker.Write() <- outcoming
