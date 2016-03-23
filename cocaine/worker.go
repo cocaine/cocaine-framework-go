@@ -32,7 +32,6 @@ func init() {
 
 const (
 	HEARTBEAT_TIMEOUT = time.Second * 20
-	DISOWN_TIMEOUT    = time.Second * 5
 )
 
 type Request struct {
@@ -161,6 +160,7 @@ type Worker struct {
 	socketIO
 
 	fallback FallbackHandler
+	disown_timeout  time.Duration
 }
 
 // Creates new instance of Worker. Returns error on fail.
@@ -177,16 +177,19 @@ func NewWorker() (worker *Worker, err error) {
 
 	workerID, _ := uuid.FromString(flagUUID)
 
+	disown_timeout := 5 * time.Second
+
 	w := Worker{
 		unpacker:        newStreamUnpacker(),
 		uuid:            workerID,
 		logger:          logger,
 		heartbeat_timer: time.NewTimer(HEARTBEAT_TIMEOUT),
-		disown_timer:    time.NewTimer(DISOWN_TIMEOUT),
+		disown_timer:    time.NewTimer(disown_timeout),
 		sessions:        make(map[int64](*Request)),
 		from_handlers:   make(chan rawMessage),
 		socketIO:        sock,
 		fallback:        defaultFallbackHandler,
+		disown_timeout:  disown_timeout,
 	}
 	w.disown_timer.Stop()
 	w.handshake()
@@ -275,11 +278,15 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 func (worker *Worker) heartbeat() {
 	heartbeat := heartbeat{messageInfo{HEARTBEAT, 0}}
 	worker.Write() <- packMsg(&heartbeat)
-	worker.disown_timer.Reset(DISOWN_TIMEOUT)
+	worker.disown_timer.Reset(worker.disown_timeout)
 	worker.heartbeat_timer.Reset(HEARTBEAT_TIMEOUT)
 }
 
 func (worker *Worker) handshake() {
 	handshake := handshakeStruct{messageInfo{HANDSHAKE, 0}, worker.uuid}
 	worker.Write() <- packMsg(&handshake)
+}
+
+func (worker *Worker) SetDisownTimeout(timeout time.Duration) {
+	worker.disown_timeout = timeout
 }
