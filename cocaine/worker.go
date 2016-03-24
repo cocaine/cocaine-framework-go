@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
+	"github.com/cocaine/cocaine-framework-go/pkg/github.com/ugorji/go/codec"
 	uuid "github.com/satori/go.uuid"
 )
 
