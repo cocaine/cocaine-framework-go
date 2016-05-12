@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/cocaine/cocaine-framework-go/vendor/src/github.com/ugorji/go/codec"
+	"github.com/ugorji/go/codec"
 )
 
 type Headers [][2]string
