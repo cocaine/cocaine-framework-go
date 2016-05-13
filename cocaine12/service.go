@@ -250,11 +250,11 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		var err error
 		headers, err = traceInfoToHeaders(traceInfo)
 		if err != nil {
-			traceLog().Err("unable to pack trace info into headers")
+			traceInfo.getLog().Err("unable to pack trace info into headers")
 		}
 
 		traceSentCall = func() {
-			traceLog().WithFields(Fields{
+			traceInfo.getLog().WithFields(Fields{
 				"trace_id":       traceHex,
 				"span_id":        spanHex,
 				"parent_id":      parentHex,
@@ -264,7 +264,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		}
 
 		traceReceivedCall = func() {
-			traceLog().WithFields(Fields{
+			traceInfo.getLog().WithFields(Fields{
 				"trace_id":       traceHex,
 				"span_id":        spanHex,
 				"parent_id":      parentHex,

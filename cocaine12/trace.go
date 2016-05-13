@@ -21,18 +21,6 @@ var (
 	closeDummySpan CloseSpan = func() {}
 )
 
-func traceLog() Logger {
-	initTraceLogger.Do(func() {
-		var err error
-		traceLogger, err = NewLogger(context.Background())
-		// there must be no error
-		if err != nil {
-			panic(fmt.Sprintf("unable to create trace logger: %v", err))
-		}
-	})
-	return traceLogger
-}
-
 func getTraceInfo(ctx context.Context) *TraceInfo {
 	if val, ok := ctx.Value(TraceInfoValue).(TraceInfo); ok {
 		return &val
@@ -46,6 +34,23 @@ type CloseSpan func()
 
 type TraceInfo struct {
 	trace, span, parent uint64
+	logger              Logger
+}
+
+func (traceInfo *TraceInfo) getLog() Logger {
+	if traceInfo.logger != nil {
+		return traceInfo.logger
+	}
+
+	initTraceLogger.Do(func() {
+		var err error
+		traceLogger, err = NewLogger(context.Background())
+		// there must be no error
+		if err != nil {
+			panic(fmt.Sprintf("unable to create trace logger: %v", err))
+		}
+	})
+	return traceLogger
 }
 
 type traced struct {
@@ -67,11 +72,16 @@ func (t *traced) Value(key interface{}) interface{} {
 
 // It might be used in client applications.
 func BeginNewTraceContext(ctx context.Context) context.Context {
+	return BeginNewTraceContextWithLogger(ctx, nil)
+}
+
+func BeginNewTraceContextWithLogger(ctx context.Context, logger Logger) context.Context {
 	ts := uint64(rand.Int63())
 	return AttachTraceInfo(ctx, TraceInfo{
 		trace:  ts,
 		span:   ts,
 		parent: 0,
+		logger: logger,
 	})
 }
 
@@ -135,7 +145,7 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 	traceInfo.parent = traceInfo.span
 	traceInfo.span = uint64(rand.Int63())
 
-	traceLog().WithFields(Fields{
+	traceInfo.getLog().WithFields(Fields{
 		"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
 		"span_id":        fmt.Sprintf("%x", traceInfo.span),
 		"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
@@ -152,7 +162,7 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 	return ctx, func() {
 		now := time.Now()
 		duration := now.Sub(startTime)
-		traceLog().WithFields(Fields{
+		traceInfo.getLog().WithFields(Fields{
 			"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
 			"span_id":        fmt.Sprintf("%x", traceInfo.span),
 			"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
