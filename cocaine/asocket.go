@@ -164,6 +164,7 @@ func (sock *asyncRWSocket) readloop() {
 			}
 
 			if err != nil {
+				sock.socketToClient.in <- nil
 				close(sock.socketToClient.in)
 				sock.close()
 				return
