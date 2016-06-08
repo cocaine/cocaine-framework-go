@@ -143,18 +143,6 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 
 func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
-		if data == nil {
-			err := ServiceError{-1, "undefined error"}
-			for _, id := range service.sessions.Keys() {
-				if ch, ok := service.sessions.Get(id); ok {
-					ch <- &serviceRes{nil, &err}
-					close(ch)
-					service.sessions.Detach(id)
-				}
-			}
-			return
-		}
-
 		for _, item := range service.unpacker.Feed(data) {
 			switch msg := item.(type) {
 			case *chunk:
@@ -171,6 +159,14 @@ func (service *Service) loop() {
 					ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
 				}
 			}
+		}
+	}
+	err := ServiceError{-1, "undefined error"}
+	for _, id := range service.sessions.Keys() {
+		if ch, ok := service.sessions.Get(id); ok {
+			ch <- &serviceRes{nil, &err}
+			close(ch)
+			service.sessions.Detach(id)
 		}
 	}
 }
