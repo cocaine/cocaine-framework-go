@@ -2,10 +2,9 @@ package cocaine
 
 import (
 	"fmt"
+	"github.com/ugorji/go/codec"
 	"sync"
 	"time"
-
-	"github.com/ugorji/go/codec"
 )
 
 type ServiceResult interface {
@@ -161,10 +160,9 @@ func (service *Service) loop() {
 			}
 		}
 	}
-	err := ServiceError{-1, "undefined error"}
 	for _, id := range service.sessions.Keys() {
 		if ch, ok := service.sessions.Get(id); ok {
-			ch <- &serviceRes{nil, &err}
+			ch <- &serviceRes{nil, &ServiceError{-1, "Disconnected"}}
 			close(ch)
 			service.sessions.Detach(id)
 		}
