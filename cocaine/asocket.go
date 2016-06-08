@@ -51,6 +51,7 @@ func (bf *asyncBuff) loop() {
 				first = pending[0]
 				_out = bf.out
 			} else if finished {
+				close(bf.out)
 				break
 			}
 			select {
