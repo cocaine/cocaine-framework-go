@@ -286,6 +286,7 @@ func (service *Service) getServiceChanPair() (In chan ServiceResult, Out chan Se
 				pending = pending[1:]
 
 			case <-service.stop: // Notification from Close()
+				close(Out)
 				return
 			}
 		}
