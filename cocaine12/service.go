@@ -20,15 +20,22 @@ var (
 	ErrZeroEndpoints = errors.New("Endpoints must contain at least one item")
 )
 
+// ConnectionError contains an error and an endpoint
+type ConnectionError struct {
+	EndpointItem
+	Err error
+}
+
 // MultiConnectionError returns from a connector which iterates over provided endpoints
-type MultiConnectionError map[string]error
+type MultiConnectionError []ConnectionError
 
 func (m MultiConnectionError) Error() string {
 	var b bytes.Buffer
-	for k, v := range m {
-		b.WriteString(k)
+	for _, v := range m {
+		b.WriteString(v.EndpointItem.String())
 		b.WriteByte(':')
-		b.WriteString(v.Error())
+		b.WriteByte(' ')
+		b.WriteString(v.Err.Error())
 		b.WriteByte(' ')
 	}
 
@@ -141,11 +148,11 @@ func serviceCreateIO(endpoints []EndpointItem) (socketIO, error) {
 		return nil, ErrZeroEndpoints
 	}
 
-	var mErr = make(MultiConnectionError)
+	var mErr = make(MultiConnectionError, 0)
 	for _, endpoint := range endpoints {
 		sock, err := newAsyncConnection("tcp", endpoint.String(), time.Second*1)
 		if err != nil {
-			mErr[endpoint.String()] = err
+			mErr = append(mErr, ConnectionError{endpoint, err})
 			continue
 		}
 
