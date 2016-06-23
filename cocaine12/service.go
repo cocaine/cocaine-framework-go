@@ -1,6 +1,8 @@
 package cocaine12
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -12,6 +14,26 @@ import (
 const (
 	ErrDisconnected = -100
 )
+
+var (
+	// ErrZeroEndpoints returns from serviceCreateIO if passed `endpoints` is an empty array
+	ErrZeroEndpoints = errors.New("Endpoints must contain at least one item")
+)
+
+// MultiConnectionError returns from a connector which iterates over provided endpoints
+type MultiConnectionError map[string]error
+
+func (m MultiConnectionError) Error() string {
+	var b bytes.Buffer
+	for k, v := range m {
+		b.WriteString(k)
+		b.WriteByte(':')
+		b.WriteString(v.Error())
+		b.WriteByte(' ')
+	}
+
+	return b.String()
+}
 
 type ServiceInfo struct {
 	Endpoints []EndpointItem
@@ -114,18 +136,23 @@ func serviceResolve(ctx context.Context, name string, endpoints []string) (*Serv
 	return l.Resolve(ctx, name)
 }
 
-func serviceCreateIO(endpoints []EndpointItem) (sock socketIO, err error) {
-CONN_LOOP:
+func serviceCreateIO(endpoints []EndpointItem) (socketIO, error) {
+	if len(endpoints) == 0 {
+		return nil, ErrZeroEndpoints
+	}
+
+	var mErr = make(MultiConnectionError)
 	for _, endpoint := range endpoints {
-		sock, err = newAsyncConnection("tcp", endpoint.String(), time.Second*1)
+		sock, err := newAsyncConnection("tcp", endpoint.String(), time.Second*1)
 		if err != nil {
+			mErr[endpoint.String()] = err
 			continue
 		}
 
-		break CONN_LOOP
+		return sock, nil
 	}
 
-	return
+	return nil, mErr
 }
 
 func NewService(ctx context.Context, name string, endpoints []string) (s *Service, err error) {
