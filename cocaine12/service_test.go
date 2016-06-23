@@ -11,6 +11,32 @@ import (
 	"golang.org/x/net/context"
 )
 
+func TestCreateIO(t *testing.T) {
+	if _, err := serviceCreateIO(nil); err != ErrZeroEndpoints {
+		t.Fatalf("%v is expected, but %v has been returned", ErrZeroEndpoints, err)
+	}
+
+	endpoints := []EndpointItem{
+		EndpointItem{"129.0.0.1", 10000},
+		EndpointItem{"128.0.0.1", 10000},
+	}
+	_, err := serviceCreateIO(endpoints)
+	merr, ok := err.(MultiConnectionError)
+	if !ok {
+		t.Fatal(err)
+	}
+
+	_, ok1 := merr[endpoints[0].String()]
+	_, ok2 := merr[endpoints[1].String()]
+	if !ok1 || !ok2 {
+		t.Fatalf("MultiConnectionError is corrupted %v", merr)
+	}
+
+	if len(merr.Error()) == 0 {
+		t.Fatal("merr.Error() is empty")
+	}
+}
+
 func TestService(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipped without Cocaine")
