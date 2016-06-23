@@ -26,15 +26,19 @@ func TestCreateIO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, ok1 := merr[endpoints[0].String()]
-	_, ok2 := merr[endpoints[1].String()]
-	if !ok1 || !ok2 {
+	if merr[0].String() != endpoints[0].String() {
+		t.Fatalf("MultiConnectionError is corrupted %v", merr)
+	}
+
+	if merr[1].String() != endpoints[1].String() {
 		t.Fatalf("MultiConnectionError is corrupted %v", merr)
 	}
 
 	if len(merr.Error()) == 0 {
 		t.Fatal("merr.Error() is empty")
 	}
+
+	fmt.Println(merr.Error())
 }
 
 func TestService(t *testing.T) {
