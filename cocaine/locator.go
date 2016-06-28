@@ -3,7 +3,6 @@ package cocaine
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/ugorji/go/codec"
@@ -39,9 +38,10 @@ func (r *ResolveResult) getMethodNumber(name string) (number int64, err error) {
 type Locator struct {
 	unpacker *streamUnpacker
 	socketIO
+	logger LocalLogger
 }
 
-func NewLocator(args ...interface{}) (*Locator, error) {
+func NewLocator(logger LocalLogger, args ...interface{}) (*Locator, error) {
 	endpoint := flagLocator
 
 	if len(args) == 1 {
@@ -50,18 +50,18 @@ func NewLocator(args ...interface{}) (*Locator, error) {
 		}
 	}
 
-	sock, err := newAsyncRWSocket("tcp", endpoint, time.Second*5)
+	sock, err := newAsyncRWSocket("tcp", endpoint, time.Second*5, logger)
 	if err != nil {
 		return nil, err
 	}
-	return &Locator{newStreamUnpacker(), sock}, nil
+	return &Locator{newStreamUnpacker(), sock, logger}, nil
 }
 
 func (locator *Locator) unpackchunk(chunk rawMessage) ResolveResult {
 	var res ResolveResult
 	err := codec.NewDecoderBytes(chunk, h).Decode(&res)
 	if err != nil {
-		log.Println("unpack chunk error", err)
+		locator.logger.Errf("unpack chunk error: %v", err)
 	}
 	return res
 }
@@ -76,7 +76,7 @@ func (locator *Locator) Resolve(name string) chan ResolveResult {
 		closed := false
 		for !closed {
 			answer := <-locator.socketIO.Read()
-			msgs := locator.unpacker.Feed(answer)
+			msgs := locator.unpacker.Feed(answer, locator.logger)
 			for _, item := range msgs {
 				switch id := item.getTypeID(); id {
 				case CHUNK:

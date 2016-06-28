@@ -10,6 +10,28 @@ import (
 
 var _ = log.Println
 
+type LocalLogger interface {
+	Debug(args ...interface{})
+	Debugf(msg string, args ...interface{})
+	Info(args ...interface{})
+	Infof(msg string, args ...interface{})
+	Warn(args ...interface{})
+	Warnf(msg string, args ...interface{})
+	Err(args ...interface{})
+	Errf(msg string, args ...interface{})
+}
+
+type LocalLoggerImpl struct{}
+
+func (l *LocalLoggerImpl) Debug(args ...interface{})              { /*pass*/ }
+func (l *LocalLoggerImpl) Debugf(msg string, args ...interface{}) { /*pass*/ }
+func (l *LocalLoggerImpl) Info(args ...interface{})               { log.Print(args) }
+func (l *LocalLoggerImpl) Infof(msg string, args ...interface{})  { log.Printf(msg, args) }
+func (l *LocalLoggerImpl) Warn(args ...interface{})               { log.Print(args) }
+func (l *LocalLoggerImpl) Warnf(msg string, args ...interface{})  { log.Printf(msg, args) }
+func (l *LocalLoggerImpl) Err(args ...interface{})                { log.Print(args) }
+func (l *LocalLoggerImpl) Errf(msg string, args ...interface{})   { log.Printf(msg, args) }
+
 type socketIO interface {
 	Read() chan rawMessage
 	Write() chan rawMessage
@@ -86,9 +108,10 @@ type asyncRWSocket struct {
 	socketToClient *asyncBuff
 	closed         chan struct{} //broadcast channel
 	mutex          sync.Mutex
+	logger         LocalLogger
 }
 
-func newAsyncRWSocket(family string, address string, timeout time.Duration) (*asyncRWSocket, error) {
+func newAsyncRWSocket(family string, address string, timeout time.Duration, logger LocalLogger) (*asyncRWSocket, error) {
 	dialer := net.Dialer{
 		Timeout:   timeout,
 		DualStack: true,
@@ -99,7 +122,7 @@ func newAsyncRWSocket(family string, address string, timeout time.Duration) (*as
 		return nil, err
 	}
 
-	sock := asyncRWSocket{conn, newAsyncBuf(), newAsyncBuf(), make(chan struct{}), sync.Mutex{}}
+	sock := asyncRWSocket{conn, newAsyncBuf(), newAsyncBuf(), make(chan struct{}), sync.Mutex{}, logger}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
@@ -139,6 +162,7 @@ func (sock *asyncRWSocket) writeloop() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
+				sock.logger.Errf("Error while writing data: %v", err)
 				sock.close()
 				// blackhole all writes
 				go func() {
@@ -165,6 +189,7 @@ func (sock *asyncRWSocket) readloop() {
 			}
 
 			if err != nil {
+				sock.logger.Errf("Error while reading data: %v", err)
 				close(sock.socketToClient.in)
 				sock.close()
 				return
@@ -179,15 +204,16 @@ type asyncWSocket struct {
 	clientToSock *asyncBuff
 	closed       chan struct{} //broadcast channel
 	mutex        sync.Mutex
+	logger       LocalLogger
 }
 
-func newWSocket(family string, address string, timeout time.Duration) (*asyncWSocket, error) {
+func newWSocket(family string, address string, timeout time.Duration, logger LocalLogger) (*asyncWSocket, error) {
 	conn, err := net.DialTimeout(family, address, timeout)
 	if err != nil {
 		return nil, err
 	}
 
-	sock := asyncWSocket{conn, newAsyncBuf(), make(chan struct{}), sync.Mutex{}}
+	sock := asyncWSocket{conn, newAsyncBuf(), make(chan struct{}), sync.Mutex{}, logger}
 	sock.readloop()
 	sock.writeloop()
 	return &sock, nil
@@ -222,6 +248,7 @@ func (sock *asyncWSocket) writeloop() {
 		for incoming := range sock.clientToSock.out {
 			_, err := sock.Conn.Write(incoming) //Add check for sending full
 			if err != nil {
+				sock.logger.Errf("Error while writing data: %v", err)
 				sock.close()
 				return
 			}
@@ -235,6 +262,7 @@ func (sock *asyncWSocket) readloop() {
 		for {
 			_, err := sock.Conn.Read(buf)
 			if err != nil {
+				sock.logger.Errf("Error while reading data: %v", err)
 				sock.close()
 				return
 			}
