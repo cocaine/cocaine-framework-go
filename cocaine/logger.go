@@ -12,7 +12,7 @@ type Logger struct {
 	args            []interface{}
 	mutex           sync.Mutex
 	is_reconnecting bool
-    name string
+	name            string
 }
 
 const (
@@ -52,7 +52,7 @@ func createIO(name string, args ...interface{}) (sock socketWriter, verbosity in
 	if err != nil {
 		return
 	}
-	sock, err = newWSocket("tcp", endpoint, time.Second*5)
+	sock, err = newWSocket("tcp", endpoint, time.Second*5, &LocalLoggerImpl{})
 	if err != nil {
 		return
 	}

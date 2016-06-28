@@ -90,12 +90,13 @@ type Service struct {
 	mutex           sync.Mutex
 	wg              sync.WaitGroup
 	is_reconnecting bool
+	localLogger     LocalLogger
 }
 
 //Creates new service instance with specifed name.
 //Optional parameter is a network endpoint of the locator (default ":10053"). Look at Locator.
-func serviceResolve(name string, args ...interface{}) (info ResolveResult, err error) {
-	l, err := NewLocator(args...)
+func serviceResolve(name string, localLogger LocalLogger, args ...interface{}) (info ResolveResult, err error) {
+	l, err := NewLocator(localLogger, args...)
 	if err != nil {
 		return
 	}
@@ -104,13 +105,13 @@ func serviceResolve(name string, args ...interface{}) (info ResolveResult, err e
 	return
 }
 
-func serviceCreateIO(endpoint string) (sock socketIO, err error) {
-	sock, err = newAsyncRWSocket("tcp", endpoint, time.Second*5)
+func serviceCreateIO(endpoint string, localLogger LocalLogger) (sock socketIO, err error) {
+	sock, err = newAsyncRWSocket("tcp", endpoint, time.Second*5, localLogger)
 	return
 }
 
-func NewService(name string, args ...interface{}) (s *Service, err error) {
-	info, err := serviceResolve(name, args...)
+func NewServiceWithLocalLogger(name string, localLogger LocalLogger, args ...interface{}) (s *Service, err error) {
+	info, err := serviceResolve(name, localLogger, args...)
 	if err != nil {
 		return
 	}
@@ -120,7 +121,7 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 		return
 	}
 
-	sock, err := serviceCreateIO(info.Endpoint.AsString())
+	sock, err := serviceCreateIO(info.Endpoint.AsString(), localLogger)
 	if err != nil {
 		return
 	}
@@ -136,14 +137,19 @@ func NewService(name string, args ...interface{}) (s *Service, err error) {
 		mutex:           sync.Mutex{},
 		wg:              sync.WaitGroup{},
 		is_reconnecting: false,
+		localLogger:     localLogger,
 	}
 	go s.loop()
 	return
 }
 
+func NewService(name string, args ...interface{}) (s *Service, err error) {
+	return NewServiceWithLocalLogger(name, &LocalLoggerImpl{}, args)
+}
+
 func (service *Service) loop() {
 	for data := range service.socketIO.Read() {
-		for _, item := range service.unpacker.Feed(data) {
+		for _, item := range service.unpacker.Feed(data, service.localLogger) {
 			switch msg := item.(type) {
 			case *chunk:
 				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
@@ -158,6 +164,8 @@ func (service *Service) loop() {
 				if ch, ok := service.sessions.Get(msg.getSessionID()); ok {
 					ch <- &serviceRes{nil, &ServiceError{msg.Code, msg.Message}}
 				}
+			default:
+				service.localLogger.Err("Got unknown message type")
 			}
 		}
 	}
@@ -199,11 +207,11 @@ func (service *Service) Reconnect(force bool) error {
 		}
 
 		// Create new socket
-		info, err := serviceResolve(service.name, service.args...)
+		info, err := serviceResolve(service.name, service.localLogger, service.args...)
 		if err != nil {
 			return err
 		}
-		sock, err := serviceCreateIO(info.Endpoint.AsString())
+		sock, err := serviceCreateIO(info.Endpoint.AsString(), service.localLogger)
 		if err != nil {
 			return err
 		}
@@ -237,7 +245,9 @@ func (service *Service) call(name string, args ...interface{}) chan ServiceResul
 func (service *Service) Call(name string, args ...interface{}) chan ServiceResult {
 	select {
 	case <-service.IsClosed():
+		service.localLogger.Err("Service is closed. Reconnect...")
 		if err := service.Reconnect(false); err != nil {
+			service.localLogger.Errf("Reconnecting error : %v", err)
 			errorOut := make(chan ServiceResult, 1)
 			errorOut <- &serviceRes{nil, &ServiceError{-32, "Disconnected"}}
 			return errorOut

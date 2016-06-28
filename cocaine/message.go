@@ -3,9 +3,10 @@ package cocaine
 import (
 	"bytes"
 	"fmt"
+	"io"
 
-	"github.com/ugorji/go/codec"
 	uuid "github.com/satori/go.uuid"
+	"github.com/ugorji/go/codec"
 )
 
 const (
@@ -245,7 +246,7 @@ type streamUnpacker struct {
 	buf []byte
 }
 
-func (unpacker *streamUnpacker) Feed(data []byte) []messageInterface {
+func (unpacker *streamUnpacker) Feed(data []byte, logger LocalLogger) []messageInterface {
 	var msgs []messageInterface
 	unpacker.buf = append(unpacker.buf, data...)
 	tmp := bytes.NewBuffer(unpacker.buf)
@@ -254,11 +255,14 @@ func (unpacker *streamUnpacker) Feed(data []byte) []messageInterface {
 		var res []interface{}
 		err := dec.Decode(&res)
 		if err != nil {
+			if err != io.EOF {
+				logger.Errf("Decoding error: %v", err)
+			}
 			break
 		} else {
 			msg, err := unpackMessage(res)
 			if err != nil {
-				fmt.Printf("Error occured: %s", err)
+				logger.Errf("Unpacking error: %v", err)
 				continue
 			}
 			msgs = append(msgs, msg)

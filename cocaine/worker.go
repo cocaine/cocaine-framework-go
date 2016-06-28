@@ -8,8 +8,8 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/ugorji/go/codec"
 	uuid "github.com/satori/go.uuid"
+	"github.com/ugorji/go/codec"
 )
 
 var (
@@ -159,13 +159,13 @@ type Worker struct {
 	from_handlers   chan rawMessage
 	socketIO
 
-	fallback FallbackHandler
-	disown_timeout  time.Duration
+	fallback       FallbackHandler
+	disown_timeout time.Duration
 }
 
 // Creates new instance of Worker. Returns error on fail.
-func NewWorker() (worker *Worker, err error) {
-	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5)
+func NewWorkerWithLocalLogger(localLogger LocalLogger) (worker *Worker, err error) {
+	sock, err := newAsyncRWSocket("unix", flagEndpoint, time.Second*5, localLogger)
 	if err != nil {
 		return
 	}
@@ -198,6 +198,10 @@ func NewWorker() (worker *Worker, err error) {
 	return
 }
 
+func NewWorker() (worker *Worker, err error) {
+	return NewWorkerWithLocalLogger(&LocalLoggerImpl{})
+}
+
 func (worker *Worker) SetFallbackHandler(fallback FallbackHandler) {
 	worker.fallback = fallback
 }
@@ -207,7 +211,7 @@ func (worker *Worker) Loop(bind map[string]EventHandler) {
 	for {
 		select {
 		case answer := <-worker.Read():
-			msgs := worker.unpacker.Feed(answer)
+			msgs := worker.unpacker.Feed(answer, worker.logger)
 			for _, rawmsg := range msgs {
 				switch msg := rawmsg.(type) {
 				case *chunk:
