@@ -144,7 +144,7 @@ func NewServiceWithLocalLogger(name string, localLogger LocalLogger, args ...int
 }
 
 func NewService(name string, args ...interface{}) (s *Service, err error) {
-	return NewServiceWithLocalLogger(name, &LocalLoggerImpl{}, args)
+	return NewServiceWithLocalLogger(name, &LocalLoggerImpl{}, args...)
 }
 
 func (service *Service) loop() {
