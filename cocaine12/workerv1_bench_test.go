@@ -32,7 +32,8 @@ func doBenchmarkWorkerEcho(b *testing.B, bullets uint64) {
 	w.disownTimer = time.NewTimer(1 * time.Hour)
 	w.heartbeatTimer = time.NewTimer(1 * time.Hour)
 
-	w.On("echo", func(ctx context.Context, req Request, resp Response) {
+	handlers := NewEventHandlers()
+	handlers.On("echo", func(ctx context.Context, req Request, resp Response) {
 		defer resp.Close()
 
 		data, err := req.Read(ctx)
@@ -43,7 +44,7 @@ func doBenchmarkWorkerEcho(b *testing.B, bullets uint64) {
 	})
 
 	go func() {
-		w.Run(nil)
+		w.Run(handlers.Call, nil)
 	}()
 	defer w.Stop()
 

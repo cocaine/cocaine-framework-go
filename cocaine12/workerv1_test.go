@@ -61,7 +61,7 @@ func TestWorkerV1(t *testing.T) {
 		t.Fatal("unable to create worker", err)
 	}
 
-	handlers := map[string]EventHandler{
+	handlers := NewEventHandlersFromMap(map[string]EventHandler{
 		"test": func(ctx context.Context, req Request, res Response) {
 			data, _ := req.Read(ctx)
 			t.Logf("Request data: %s", data)
@@ -84,10 +84,10 @@ func TestWorkerV1(t *testing.T) {
 		"panic": func(ctx context.Context, req Request, res Response) {
 			panic("PANIC")
 		},
-	}
+	})
 
 	go func() {
-		w.Run(handlers)
+		w.Run(handlers.Call, nil)
 		close(onStop)
 	}()
 
@@ -199,7 +199,7 @@ func TestWorkerV1Termination(t *testing.T) {
 	}
 
 	go func() {
-		w.Run(map[string]EventHandler{})
+		w.Run(nil, nil)
 		close(onStop)
 	}()
 
@@ -269,7 +269,9 @@ func TestWorkerLoad(t *testing.T) {
 		t.Fatal("unable to create worker", err)
 	}
 
-	w.On("echo", func(ctx context.Context, req Request, res Response) {
+	handlers := NewEventHandlers()
+
+	handlers.On("echo", func(ctx context.Context, req Request, res Response) {
 		defer res.Close()
 		req.Read(ctx)
 		time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
@@ -277,7 +279,7 @@ func TestWorkerLoad(t *testing.T) {
 	})
 
 	go func() {
-		w.Run(map[string]EventHandler{})
+		w.Run(handlers.Call, nil)
 	}()
 
 	j := 0
