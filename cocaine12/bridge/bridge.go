@@ -70,57 +70,55 @@ func (r *responseWriter) Write(body []byte) (int, error) {
 	return len(body), nil
 }
 
+func (b *Bridge) handle(ctx context.Context, event string, request cocaine.Request, response cocaine.Response) {
+	defer response.Close()
+
+	// Read the first chunk
+	// It consists of method, uri, httpversion, headers, body.
+	// They are packed by msgpack
+	msg, err := request.Read(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			response.Write(cocaine.WriteHead(http.StatusRequestTimeout, cocaine.Headers{}))
+			response.Write([]byte("request was not received during a timeout"))
+			return
+		}
+
+		response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
+		response.Write([]byte("cannot process request " + err.Error()))
+		return
+	}
+
+	httpRequest, err := cocaine.UnpackProxyRequest(msg)
+	if err != nil {
+		response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
+		response.Write([]byte(fmt.Sprintf("malformed request: %v", err)))
+		return
+	}
+
+	// Set scheme and endpoint
+	httpRequest.URL.Scheme = "http"
+	httpRequest.URL.Host = b.config.Endpoint()
+
+	appResp, err := http.DefaultClient.Do(httpRequest)
+	if err != nil {
+		response.Write(cocaine.WriteHead(http.StatusInternalServerError, cocaine.Headers{}))
+		response.Write([]byte(fmt.Sprintf("unable to proxy a request: %v", err)))
+		return
+	}
+	defer appResp.Body.Close()
+
+	response.Write(cocaine.WriteHead(appResp.StatusCode, cocaine.HeadersHTTPtoCocaine(appResp.Header)))
+
+	io.Copy(&responseWriter{response}, appResp.Body)
+}
+
 func NewBridge(cfg *BridgeConfig, logger cocaine.Logger) (*Bridge, error) {
 	var worker *cocaine.Worker
 	worker, err := cocaine.NewWorker()
 	if err != nil {
 		return nil, err
 	}
-
-	endpoint := cfg.Endpoint()
-
-	worker.SetFallbackHandler(func(ctx context.Context, event string, request cocaine.Request, response cocaine.Response) {
-		defer response.Close()
-
-		// Read the first chunk
-		// It consists of method, uri, httpversion, headers, body.
-		// They are packed by msgpack
-		msg, err := request.Read(ctx)
-		if err != nil {
-			if ctx.Err() != nil {
-				response.Write(cocaine.WriteHead(http.StatusRequestTimeout, cocaine.Headers{}))
-				response.Write([]byte("request was not received during a timeout"))
-				return
-			}
-
-			response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
-			response.Write([]byte("cannot process request " + err.Error()))
-			return
-		}
-
-		httpRequest, err := cocaine.UnpackProxyRequest(msg)
-		if err != nil {
-			response.Write(cocaine.WriteHead(http.StatusBadRequest, cocaine.Headers{}))
-			response.Write([]byte(fmt.Sprintf("malformed request: %v", err)))
-			return
-		}
-
-		// Set scheme and endpoint
-		httpRequest.URL.Scheme = "http"
-		httpRequest.URL.Host = endpoint
-
-		appResp, err := http.DefaultClient.Do(httpRequest)
-		if err != nil {
-			response.Write(cocaine.WriteHead(http.StatusInternalServerError, cocaine.Headers{}))
-			response.Write([]byte(fmt.Sprintf("unable to proxy a request: %v", err)))
-			return
-		}
-		defer appResp.Body.Close()
-
-		response.Write(cocaine.WriteHead(appResp.StatusCode, cocaine.HeadersHTTPtoCocaine(appResp.Header)))
-
-		io.Copy(&responseWriter{response}, appResp.Body)
-	})
 
 	child := exec.Command(cfg.Name, cfg.Args...)
 	// attach environment
@@ -161,7 +159,7 @@ func (b *Bridge) Start() error {
 			default:
 			}
 		}
-		b.worker.Run(nil)
+		b.worker.Run(b.handle, nil)
 	}()
 
 	stdout, err := b.child.StdoutPipe()

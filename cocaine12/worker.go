@@ -60,23 +60,6 @@ type ResponseStream interface {
 // Response provides an interface for a handler to reply
 type Response ResponseStream
 
-// EventHandler represents a type of handler
-type EventHandler func(context.Context, Request, Response)
-
-// FallbackEventHandler handles an event if there is no other handler
-// for the given event
-type FallbackEventHandler func(context.Context, string, Request, Response)
-
-// TerminationHandler invokes when termination message is received
-type TerminationHandler func(context.Context)
-
-// DefaultFallbackEventHandler sends an error message if a client requests
-// unhandled event
-func DefaultFallbackEventHandler(ctx context.Context, event string, request Request, response Response) {
-	errMsg := fmt.Sprintf("There is no handler for an event %s", event)
-	response.ErrorMsg(ErrorNoEventHandler, errMsg)
-}
-
 func trapRecoverAndClose(ctx context.Context, event string, response Response, printStack bool) {
 	if recoverInfo := recover(); recoverInfo != nil {
 		var stack []byte
@@ -110,12 +93,10 @@ type Worker struct {
 	disownTimer *time.Timer
 	// Map handlers to sessions
 	sessions map[uint64]requestStream
-	// handlers
-	handlers map[string]EventHandler
+	// handler
+	handler RequestHandler
 	// Notify Run about stop
 	stopped chan struct{}
-	// FallbackEventHandler handles an event if there is no other handler
-	fallbackHandler FallbackEventHandler
 	// if set recoverTrap sends Stack
 	debug bool
 	// allow the worker to handle SIGUSR1 to print all goroutines stacks
@@ -158,11 +139,8 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 		disownTimer:    time.NewTimer(disownTimeout),
 
 		sessions: make(map[uint64]requestStream),
-		handlers: make(map[string]EventHandler),
 
 		stopped: make(chan struct{}),
-
-		fallbackHandler: DefaultFallbackEventHandler,
 
 		debug:              debug,
 		stackSignalEnabled: true,
@@ -196,22 +174,6 @@ func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker,
 	return w, nil
 }
 
-// On binds the handler for a given event
-func (w *Worker) On(event string, handler EventHandler) {
-	w.handlers[event] = handler
-}
-
-// SetFallbackHandler sets the handler to be a fallback handler
-func (w *Worker) SetFallbackHandler(handler FallbackEventHandler) {
-	w.fallbackHandler = handler
-}
-
-// call a fallback handler inwith a panic trap
-func (w *Worker) callFallbackHandler(ctx context.Context, event string, request Request, response Response) {
-	defer trapRecoverAndClose(ctx, event, response, w.debug)
-	w.fallbackHandler(ctx, event, request, response)
-}
-
 // SetDebug enables debug mode of the Worker.
 // It allows to print Stack of a paniced handler
 func (w *Worker) SetDebug(debug bool) {
@@ -225,19 +187,13 @@ func (w *Worker) EnableStackSignal(enable bool) {
 	w.stackSignalEnabled = enable
 }
 
-// SetTerminationHandler allows to attach handler which will be called
-// when SIGTERM arrives
-func (w *Worker) SetTerminationHandler(handler TerminationHandler) {
-	w.terminationHandler = handler
-}
-
 // Run makes the worker anounce itself to a cocaine-runtime
 // as being ready to hadnle incoming requests and hablde them
-func (w *Worker) Run(handlers map[string]EventHandler) error {
-	for event, handler := range handlers {
-		w.On(event, handler)
-	}
-
+// terminationHandler allows to attach handler which will be called
+// when SIGTERM arrives
+func (w *Worker) Run(handler RequestHandler, terminationHandler TerminationHandler) error {
+	w.handler = handler
+	w.terminationHandler = terminationHandler
 	return w.loop()
 }
 
@@ -397,12 +353,6 @@ func (w *Worker) onInvoke(msg *Message) error {
 	requestStream := newRequest(w.dispatcher)
 	w.sessions[currentSession] = requestStream
 
-	handler, ok := w.handlers[event]
-	if !ok {
-		go w.callFallbackHandler(ctx, event, requestStream, responseStream)
-		return nil
-	}
-
 	go func() {
 		// this trap catches a panic from a handler
 		// and checks if the response is closed.
@@ -411,7 +361,7 @@ func (w *Worker) onInvoke(msg *Message) error {
 		ctx, closeHandlerSpan := NewSpan(ctx, event)
 		defer closeHandlerSpan()
 
-		handler(ctx, requestStream, responseStream)
+		w.handler(ctx, event, requestStream, responseStream)
 	}()
 	return nil
 }
