@@ -29,8 +29,8 @@ func doBenchmarkWorkerEcho(b *testing.B, bullets uint64) {
 		panic(err)
 	}
 
-	w.disownTimer = time.NewTimer(1 * time.Hour)
-	w.heartbeatTimer = time.NewTimer(1 * time.Hour)
+	w.impl.disownTimer = time.NewTimer(1 * time.Hour)
+	w.impl.heartbeatTimer = time.NewTimer(1 * time.Hour)
 
 	w.On("echo", func(ctx context.Context, req Request, resp Response) {
 		defer resp.Close()
