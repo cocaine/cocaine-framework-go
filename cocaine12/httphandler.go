@@ -124,7 +124,7 @@ func HeadersCocaineToHTTP(hdr Headers) http.Header {
 //		}
 //	}
 func WrapHandler(handler http.Handler) EventHandler {
-	var wrapper = func(ctx context.Context, request Request, response Response) {
+	return func(ctx context.Context, request Request, response Response) {
 		defer response.Close()
 
 		w, httpRequest, err := convertToHTTPFunc(ctx, request, response)
@@ -135,8 +135,6 @@ func WrapHandler(handler http.Handler) EventHandler {
 		handler.ServeHTTP(w, httpRequest)
 		w.finishRequest()
 	}
-
-	return wrapper
 }
 
 func WrapHTTPFunc(handler func(ctx context.Context, w http.ResponseWriter, req *http.Request)) EventHandler {
