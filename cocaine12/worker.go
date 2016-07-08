@@ -2,16 +2,16 @@ package cocaine12
 
 // Worker performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
-// This is an adapter to Worker2
+// This is an adapter to WorkerNG
 type Worker struct {
-	impl               *Worker2
+	impl               *WorkerNG
 	handlers           *EventHandlers
 	terminationHandler TerminationHandler
 }
 
-// NewWorker connects to the cocaine-runtime and create Worker2 on top of this connection
+// NewWorker connects to the cocaine-runtime and create WorkerNG on top of this connection
 func NewWorker() (*Worker, error) {
-	impl, err := NewWorker2()
+	impl, err := NewWorkerNG()
 	if err != nil {
 		return nil, err
 	}
@@ -20,7 +20,7 @@ func NewWorker() (*Worker, error) {
 
 // Used in tests only
 func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
-	impl, err := newWorker2(conn, id, protoVersion, debug)
+	impl, err := newWorkerNG(conn, id, protoVersion, debug)
 	if err != nil {
 		return nil, err
 	}

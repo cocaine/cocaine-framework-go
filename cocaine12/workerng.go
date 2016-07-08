@@ -80,9 +80,9 @@ func trapRecoverAndClose(ctx context.Context, event string, response Response, p
 	response.Close()
 }
 
-// Worker performs IO operations between an application
+// WorkerNG performs IO operations between an application
 // and cocaine-runtime, dispatches incoming messages
-type Worker2 struct {
+type WorkerNG struct {
 	// Connection to cocaine-runtime
 	conn socketIO
 	// Id to introduce myself to cocaine-runtime
@@ -109,8 +109,8 @@ type Worker2 struct {
 	terminationHandler TerminationHandler
 }
 
-// NewWorker2 connects to the cocaine-runtime and create Worker2 on top of this connection
-func NewWorker2() (*Worker2, error) {
+// NewWorkerNG connects to the cocaine-runtime and create WorkerNG on top of this connection
+func NewWorkerNG() (*WorkerNG, error) {
 	workerID := GetDefaults().UUID()
 
 	unixSocketEndpoint := GetDefaults().Endpoint()
@@ -125,13 +125,13 @@ func NewWorker2() (*Worker2, error) {
 			unixSocketEndpoint, err)
 	}
 
-	return newWorker2(sock, workerID,
+	return newWorkerNG(sock, workerID,
 		GetDefaults().Protocol(),
 		GetDefaults().Debug())
 }
 
-func newWorker2(conn socketIO, id string, protoVersion int, debug bool) (*Worker2, error) {
-	w := &Worker2{
+func newWorkerNG(conn socketIO, id string, protoVersion int, debug bool) (*WorkerNG, error) {
+	w := &WorkerNG{
 		conn: conn,
 		id:   id,
 
@@ -176,14 +176,14 @@ func newWorker2(conn socketIO, id string, protoVersion int, debug bool) (*Worker
 
 // SetDebug enables debug mode of the Worker.
 // It allows to print Stack of a paniced handler
-func (w *Worker2) SetDebug(debug bool) {
+func (w *WorkerNG) SetDebug(debug bool) {
 	w.debug = debug
 }
 
 // EnableStackSignal allows/disallows the worker to catch
 // SIGUSR1 to print all goroutines stacks. It's enabled by default.
 // This function must be called before Worker.Run to take effect.
-func (w *Worker2) EnableStackSignal(enable bool) {
+func (w *WorkerNG) EnableStackSignal(enable bool) {
 	w.stackSignalEnabled = enable
 }
 
@@ -191,14 +191,14 @@ func (w *Worker2) EnableStackSignal(enable bool) {
 // as being ready to hadnle incoming requests and hablde them
 // terminationHandler allows to attach handler which will be called
 // when SIGTERM arrives
-func (w *Worker2) Run(handler RequestHandler, terminationHandler TerminationHandler) error {
+func (w *WorkerNG) Run(handler RequestHandler, terminationHandler TerminationHandler) error {
 	w.handler = handler
 	w.terminationHandler = terminationHandler
 	return w.loop()
 }
 
 // Stop makes the Worker stop handling requests
-func (w *Worker2) Stop() {
+func (w *WorkerNG) Stop() {
 	if w.isStopped() {
 		return
 	}
@@ -207,7 +207,7 @@ func (w *Worker2) Stop() {
 	w.conn.Close()
 }
 
-func (w *Worker2) isStopped() bool {
+func (w *WorkerNG) isStopped() bool {
 	select {
 	case <-w.stopped:
 		return true
@@ -216,7 +216,7 @@ func (w *Worker2) isStopped() bool {
 	return false
 }
 
-func (w *Worker2) loop() error {
+func (w *WorkerNG) loop() error {
 	// Send heartbeat to notify cocaine-runtime
 	// we are ready to work
 	w.onHeartbeatTimeout()
@@ -267,7 +267,7 @@ func (w *Worker2) loop() error {
 }
 
 // printAllStacks prints all stacks to stderr and writes to a file
-func (w *Worker2) printAllStacks() {
+func (w *WorkerNG) printAllStacks() {
 	stackTrace := dumpStack()
 	// print to stdout to have it in the logs
 	fmt.Printf("=== START STACKTRACE ===\n%s\n=== END STACKTRACE ===", stackTrace)
@@ -280,11 +280,11 @@ func (w *Worker2) printAllStacks() {
 
 // A reply to heartbeat is not arrived during disownTimeout,
 // so it seems cocaine-runtime has died
-func (w *Worker2) onDisownTimeout() {
+func (w *WorkerNG) onDisownTimeout() {
 	w.Stop()
 }
 
-func (w *Worker2) onHeartbeatTimeout() {
+func (w *WorkerNG) onHeartbeatTimeout() {
 	// Wait for the reply until disown timeout comes
 	w.disownTimer.Reset(disownTimeout)
 	// Send next heartbeat over heartbeatTimeout
@@ -300,7 +300,7 @@ func (w *Worker2) onHeartbeatTimeout() {
 // Send handshake message to cocaine-runtime
 // It is needed to be called only once on a startup
 // to notify runtime that we have started
-func (w *Worker2) sendHandshake() error {
+func (w *WorkerNG) sendHandshake() error {
 	select {
 	case w.conn.Write() <- w.dispatcher.newHandshake(w.id):
 	case <-w.conn.IsClosed():
@@ -312,26 +312,26 @@ func (w *Worker2) sendHandshake() error {
 
 // Message handlers
 
-func (w *Worker2) onChoke(msg *Message) {
+func (w *WorkerNG) onChoke(msg *Message) {
 	if reqStream, ok := w.sessions[msg.Session]; ok {
 		reqStream.Close()
 		delete(w.sessions, msg.Session)
 	}
 }
 
-func (w *Worker2) onChunk(msg *Message) {
+func (w *WorkerNG) onChunk(msg *Message) {
 	if reqStream, ok := w.sessions[msg.Session]; ok {
 		reqStream.push(msg)
 	}
 }
 
-func (w *Worker2) onError(msg *Message) {
+func (w *WorkerNG) onError(msg *Message) {
 	if reqStream, ok := w.sessions[msg.Session]; ok {
 		reqStream.push(msg)
 	}
 }
 
-func (w *Worker2) onInvoke(msg *Message) error {
+func (w *WorkerNG) onInvoke(msg *Message) error {
 	event, ok := getEventName(msg)
 	if !ok {
 		// corrupted message
@@ -366,14 +366,14 @@ func (w *Worker2) onInvoke(msg *Message) error {
 	return nil
 }
 
-func (w *Worker2) onHeartbeat(msg *Message) {
+func (w *WorkerNG) onHeartbeat(msg *Message) {
 	// Reply to a heartbeat has been received,
 	// so we are not disowned & disownTimer must be stopped
 	// It will be launched when the next heartbeat is sent
 	w.disownTimer.Stop()
 }
 
-func (w *Worker2) onTerminate(msg *Message) {
+func (w *WorkerNG) onTerminate(msg *Message) {
 	if w.terminationHandler != nil {
 		ctx, cancelTimeout := context.WithTimeout(context.Background(), terminationTimeout)
 		onDone := make(chan struct{})
