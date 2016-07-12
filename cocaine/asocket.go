@@ -134,7 +134,7 @@ func (sock *asyncRWSocket) Close() {
 	sock.close()
 }
 
-func (sock *asyncRWSocket) close() {
+func (sock *asyncRWSocket) close() bool {
 	sock.mutex.Lock()
 	defer sock.mutex.Unlock()
 	select {
@@ -142,7 +142,9 @@ func (sock *asyncRWSocket) close() {
 	default:
 		close(sock.closed)
 		sock.Conn.Close()
+		return true
 	}
+	return false
 }
 
 func (sock *asyncRWSocket) IsClosed() (broadcast <-chan struct{}) {
@@ -189,9 +191,11 @@ func (sock *asyncRWSocket) readloop() {
 			}
 
 			if err != nil {
-				sock.logger.Errf("Error while reading data: %v", err)
 				close(sock.socketToClient.in)
-				sock.close()
+				if sock.close() {
+					// pass errors like "use of closed network connection"
+					sock.logger.Errf("Error while reading data: %v", err)
+				}
 				return
 			}
 		}
@@ -223,7 +227,7 @@ func (sock *asyncWSocket) Write() chan rawMessage {
 	return sock.clientToSock.in
 }
 
-func (sock *asyncWSocket) close() {
+func (sock *asyncWSocket) close() bool {
 	sock.mutex.Lock() // Is it really necessary???
 	defer sock.mutex.Unlock()
 	select {
@@ -231,7 +235,9 @@ func (sock *asyncWSocket) close() {
 	default:
 		close(sock.closed)
 		sock.Conn.Close()
+		return true
 	}
+	return false
 }
 
 func (sock *asyncWSocket) Close() {
@@ -262,8 +268,10 @@ func (sock *asyncWSocket) readloop() {
 		for {
 			_, err := sock.Conn.Read(buf)
 			if err != nil {
-				sock.logger.Errf("Error while reading data: %v", err)
-				sock.close()
+				if sock.close() {
+					// pass errors like "use of closed network connection"
+					sock.logger.Errf("Error while reading data: %v", err)
+				}
 				return
 			}
 		}
