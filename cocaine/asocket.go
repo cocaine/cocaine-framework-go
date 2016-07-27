@@ -25,12 +25,12 @@ type LocalLoggerImpl struct{}
 
 func (l *LocalLoggerImpl) Debug(args ...interface{})              { /*pass*/ }
 func (l *LocalLoggerImpl) Debugf(msg string, args ...interface{}) { /*pass*/ }
-func (l *LocalLoggerImpl) Info(args ...interface{})               { log.Print(args) }
-func (l *LocalLoggerImpl) Infof(msg string, args ...interface{})  { log.Printf(msg, args) }
-func (l *LocalLoggerImpl) Warn(args ...interface{})               { log.Print(args) }
-func (l *LocalLoggerImpl) Warnf(msg string, args ...interface{})  { log.Printf(msg, args) }
-func (l *LocalLoggerImpl) Err(args ...interface{})                { log.Print(args) }
-func (l *LocalLoggerImpl) Errf(msg string, args ...interface{})   { log.Printf(msg, args) }
+func (l *LocalLoggerImpl) Info(args ...interface{})               { /*pass*/ }
+func (l *LocalLoggerImpl) Infof(msg string, args ...interface{})  { /*pass*/ }
+func (l *LocalLoggerImpl) Warn(args ...interface{})               { /*pass*/ }
+func (l *LocalLoggerImpl) Warnf(msg string, args ...interface{})  { /*pass*/ }
+func (l *LocalLoggerImpl) Err(args ...interface{})                { /*pass*/ }
+func (l *LocalLoggerImpl) Errf(msg string, args ...interface{})   { /*pass*/ }
 
 type socketIO interface {
 	Read() chan rawMessage
