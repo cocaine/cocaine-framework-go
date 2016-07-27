@@ -256,13 +256,13 @@ func (unpacker *streamUnpacker) Feed(data []byte, logger LocalLogger) []messageI
 		err := dec.Decode(&res)
 		if err != nil {
 			if err != io.EOF {
-				logger.Errf("Decoding error: %v", err)
+				logger.Warnf("Decoding error: %v", err)
 			}
 			break
 		} else {
 			msg, err := unpackMessage(res)
 			if err != nil {
-				logger.Errf("Unpacking error: %v", err)
+				logger.Warnf("Unpacking error: %v", err)
 				continue
 			}
 			msgs = append(msgs, msg)
