@@ -4,30 +4,22 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
-const loggerEmit = 0
+const (
+	loggerEmit      = 0
+	uuidLoggerField = "uuid"
+)
 
 type cocaineLogger struct {
 	*Service
 
-	mu       sync.Mutex
-	severity Severity
-	prefix   string
-}
-
-type attrPair struct {
-	Name  string
-	Value interface{}
-}
-
-func formatFields(f Fields) []attrPair {
-	formatted := make([]attrPair, 0, len(f))
-	for k, v := range f {
-		formatted = append(formatted, attrPair{k, v})
-	}
-
-	return formatted
+	mu         sync.Mutex
+	severity   Severity
+	prefix     string
+	workerUuid string
 }
 
 func newCocaineLogger(ctx context.Context, name string, endpoints ...string) (Logger, error) {
@@ -37,9 +29,10 @@ func newCocaineLogger(ctx context.Context, name string, endpoints ...string) (Lo
 	}
 
 	logger := &cocaineLogger{
-		Service:  service,
-		severity: -100,
-		prefix:   fmt.Sprintf("app/%s", GetDefaults().ApplicationName()),
+		Service:    service,
+		severity:   -100,
+		prefix:     fmt.Sprintf("app/%s", GetDefaults().ApplicationName()),
+		workerUuid: GetDefaults().UUID(),
 	}
 
 	return logger, nil
@@ -90,22 +83,54 @@ func (c *cocaineLogger) WithFields(fields Fields) *Entry {
 	}
 }
 
-func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
-	var methodArgs []interface{}
+func packPair(b []byte, key string, value interface{}) []byte {
+	b = msgp.AppendArrayHeader(b, 2)
+	b = msgp.AppendString(b, key)
+	b, err := msgp.AppendIntf(b, value)
+	if err != nil {
+		b = msgp.AppendString(b, err.Error())
+	}
+	return b
+}
+
+func packLogPayload(level Severity, prefix string, u string, fields Fields, msg string, args ...interface{}) []byte {
+	var formattedMessage = msg
 	if len(args) > 0 {
-		methodArgs = []interface{}{level, c.prefix, fmt.Sprintf(msg, args...), formatFields(fields)}
+		formattedMessage = fmt.Sprintf(msg, args...)
+	}
+	// pack message args
+	// 4 = level + prefix + message + tags
+	const sz = 4
+	// TODO: calculate capacity for fields
+	var b = make([]byte, 0, msgp.Int32Size+msgp.StringPrefixSize+len(formattedMessage))
+	// Payload array header
+	b = msgp.AppendArrayHeader(b, sz)
+	// log level
+	b = msgp.AppendInt32(b, int32(level))
+	// logger prefix
+	b = msgp.AppendString(b, prefix)
+	// log message
+	b = msgp.AppendString(b, formattedMessage)
+	// pack fields
+	// NOTE: I hope we will never overflow uin32
+	if u != "" {
+		b = msgp.AppendArrayHeader(b, uint32(len(fields))+1)
+		b = packPair(b, uuidLoggerField, u)
 	} else {
-		methodArgs = []interface{}{level, c.prefix, msg, formatFields(fields)}
+		b = msgp.AppendArrayHeader(b, uint32(len(fields)))
 	}
 
+	for k, v := range fields {
+		b = packPair(b, k, v)
+	}
+	return b
+}
+
+func (c *cocaineLogger) log(level Severity, fields Fields, msg string, args ...interface{}) {
+	payload := packLogPayload(level, c.prefix, c.workerUuid, fields, msg, args)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	loggermsg := &Message{
-		CommonMessageInfo: CommonMessageInfo{c.Service.sessions.Next(), loggerEmit},
-		Payload:           methodArgs,
-	}
-
+	loggermsg := newMessageRawArgs(c.Service.sessions.Next(), loggerEmit, msgp.Raw(payload), nil)
 	c.Service.sendMsg(loggermsg)
 }
 

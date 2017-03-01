@@ -3,11 +3,13 @@ package cocaine12
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestLogger(t *testing.T) {
-	ctx := context.Background()
-	log, err := NewLogger(ctx)
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
+	log, err := newCocaineLogger(ctx, defaultLoggerName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +20,7 @@ func TestLogger(t *testing.T) {
 	log.WithFields(Fields{"a": 1, "b": 2}).Debugf("Debug %v", log.Verbosity(ctx))
 }
 
-func BenchmarkFormatFields5(b *testing.B) {
+func BenchmarkFormatMessageWith5Fields(b *testing.B) {
 	fields := Fields{
 		"A":    1,
 		"B":    2,
@@ -26,6 +28,6 @@ func BenchmarkFormatFields5(b *testing.B) {
 		"TEXT": "TEXT",
 	}
 	for i := 0; i < b.N; i++ {
-		formatFields(fields)
+		packLogPayload(DebugLevel, "prefix", "workeruuid", fields, "message")
 	}
 }

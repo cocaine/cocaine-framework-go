@@ -38,7 +38,7 @@ var (
 )
 
 type requestStream interface {
-	push(*Message)
+	push(*message)
 	Close()
 }
 
@@ -326,40 +326,40 @@ func (w *WorkerNG) sendHandshake() error {
 
 // Message handlers
 
-func (w *WorkerNG) onChoke(msg *Message) {
-	if reqStream, ok := w.sessions[msg.Session]; ok {
+func (w *WorkerNG) onChoke(msg *message) {
+	if reqStream, ok := w.sessions[msg.session]; ok {
 		reqStream.Close()
-		delete(w.sessions, msg.Session)
+		delete(w.sessions, msg.session)
 	}
 }
 
-func (w *WorkerNG) onChunk(msg *Message) {
-	if reqStream, ok := w.sessions[msg.Session]; ok {
+func (w *WorkerNG) onChunk(msg *message) {
+	if reqStream, ok := w.sessions[msg.session]; ok {
 		reqStream.push(msg)
 	}
 }
 
-func (w *WorkerNG) onError(msg *Message) {
-	if reqStream, ok := w.sessions[msg.Session]; ok {
+func (w *WorkerNG) onError(msg *message) {
+	if reqStream, ok := w.sessions[msg.session]; ok {
 		reqStream.push(msg)
 	}
 }
 
-func (w *WorkerNG) onInvoke(msg *Message) error {
-	event, ok := getEventName(msg)
-	if !ok {
+func (w *WorkerNG) onInvoke(msg *message) error {
+	var event eventName
+	if _, err := event.UnmarshalMsg(msg.payload); err != nil {
 		// corrupted message
-		return fmt.Errorf("unable to get an event name from %s", msg.String())
+		return fmt.Errorf("unable to get an event name from %s: %v", msg.String(), err)
 	}
 
 	var (
-		currentSession = msg.Session
+		currentSession = msg.session
 		ctx            context.Context
 	)
 
 	ctx = context.Background()
 
-	if traceInfo, err := msg.Headers.getTraceData(); err == nil {
+	if traceInfo, err := msg.headers.getTraceData(); err == nil {
 		ctx = AttachTraceInfo(ctx, traceInfo)
 	}
 
@@ -368,6 +368,7 @@ func (w *WorkerNG) onInvoke(msg *Message) error {
 	w.sessions[currentSession] = requestStream
 
 	go func() {
+		event := string(event)
 		// this trap catches a panic from a handler
 		// and checks if the response is closed.
 		defer trapRecoverAndClose(ctx, event, responseStream, w.debug)
@@ -380,14 +381,14 @@ func (w *WorkerNG) onInvoke(msg *Message) error {
 	return nil
 }
 
-func (w *WorkerNG) onHeartbeat(msg *Message) {
+func (w *WorkerNG) onHeartbeat(msg *message) {
 	// Reply to a heartbeat has been received,
 	// so we are not disowned & disownTimer must be stopped
 	// It will be launched when the next heartbeat is sent
 	w.disownTimer.Stop()
 }
 
-func (w *WorkerNG) onTerminate(msg *Message) {
+func (w *WorkerNG) onTerminate(msg *message) {
 	if w.terminationHandler != nil {
 		ctx, cancelTimeout := context.WithTimeout(context.Background(), terminationTimeout)
 		onDone := make(chan struct{})

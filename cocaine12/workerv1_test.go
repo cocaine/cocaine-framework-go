@@ -1,3 +1,5 @@
+// +build ignore
+
 package cocaine12
 
 import (
@@ -34,7 +36,7 @@ func testConn() (io.ReadWriteCloser, io.ReadWriteCloser) {
 	return &pipeConn{read1, write2}, &pipeConn{read2, write1}
 }
 
-func checkTypeAndSession(t *testing.T, msg *Message, eSession uint64, eType uint64) {
+func checkTypeAndSession(t *testing.T, msg *message, eSession uint64, eType uint64) {
 	if msg.MsgType != eType {
 		t.Fatalf("%d expected, but got %d: %v", eType, msg.MsgType, msg)
 	}

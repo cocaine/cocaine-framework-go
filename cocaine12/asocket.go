@@ -1,41 +1,40 @@
 package cocaine12
 
 import (
-	"bufio"
 	"io"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/ugorji/go/codec"
+	"github.com/tinylib/msgp/msgp"
 )
 
-var (
-	mhAsocket = codec.MsgpackHandle{
-		BasicHandle: codec.BasicHandle{
-			EncodeOptions: codec.EncodeOptions{
-				StructToArray: true,
-			},
-		},
-	}
-	hAsocket = &mhAsocket
-)
+// var (
+// 	mhAsocket = codec.MsgpackHandle{
+// 		BasicHandle: codec.BasicHandle{
+// 			EncodeOptions: codec.EncodeOptions{
+// 				StructToArray: true,
+// 			},
+// 		},
+// 	}
+// 	hAsocket = &mhAsocket
+// )
 
 type asyncSender interface {
-	Send(*Message)
+	Send(*message)
 }
 
 type socketIO interface {
 	asyncSender
-	Read() chan *Message
-	Write() chan *Message
+	Read() chan *message
+	Write() chan *message
 	IsClosed() <-chan struct{}
 	Close()
 }
 
 type asyncBuff struct {
-	in  chan *Message
-	out chan *Message
+	in  chan *message
+	out chan *message
 
 	stop chan (<-chan time.Time)
 	wait chan struct{}
@@ -43,8 +42,8 @@ type asyncBuff struct {
 
 func newAsyncBuf() *asyncBuff {
 	buf := &asyncBuff{
-		in:  make(chan *Message),
-		out: make(chan *Message),
+		in:  make(chan *message),
+		out: make(chan *message),
 
 		// to stop my loop
 		stop: make(chan (<-chan time.Time)),
@@ -66,7 +65,7 @@ func (bf *asyncBuff) loop() {
 
 		var (
 			// buffer for messages
-			pending []*Message
+			pending []*message
 
 			// it should be read until closed
 			// to get all messages from a sender
@@ -84,8 +83,8 @@ func (bf *asyncBuff) loop() {
 
 		for {
 			var (
-				candidate *Message
-				out       chan *Message
+				candidate *message
+				out       chan *message
 			)
 
 			if len(pending) > 0 {
@@ -223,15 +222,15 @@ func (sock *asyncRWSocket) IsClosed() (broadcast <-chan struct{}) {
 	return sock.closed
 }
 
-func (sock *asyncRWSocket) Write() chan *Message {
+func (sock *asyncRWSocket) Write() chan *message {
 	return sock.upstreamBuf.in
 }
 
-func (sock *asyncRWSocket) Read() chan *Message {
+func (sock *asyncRWSocket) Read() chan *message {
 	return sock.downstreamBuf.out
 }
 
-func (sock *asyncRWSocket) Send(msg *Message) {
+func (sock *asyncRWSocket) Send(msg *message) {
 	select {
 	case sock.Write() <- msg:
 	case <-sock.IsClosed():
@@ -242,11 +241,9 @@ func (sock *asyncRWSocket) Send(msg *Message) {
 
 func (sock *asyncRWSocket) writeloop() {
 	go func() {
-		var buf = bufio.NewWriter(sock.conn)
-		encoder := codec.NewEncoder(buf, hAsocket)
+		wr := msgp.NewWriter(sock.conn)
 		for incoming := range sock.upstreamBuf.out {
-			err := encoder.Encode(incoming)
-			if err != nil {
+			if err := incoming.EncodeMsg(wr); err != nil {
 				sock.close()
 				// blackhole all pending writes. See #31
 				go func() {
@@ -256,23 +253,22 @@ func (sock *asyncRWSocket) writeloop() {
 				}()
 				return
 			}
-			buf.Flush()
+			wr.Flush()
 		}
 	}()
 }
 
 func (sock *asyncRWSocket) readloop() {
 	go func() {
-		decoder := codec.NewDecoder(bufio.NewReader(sock.conn), hAsocket)
+		r := msgp.NewReader(sock.conn)
 		for {
-			var message *Message
-			err := decoder.Decode(&message)
-			if err != nil {
+			var msg message
+			if err := msg.DecodeMsg(r); err != nil {
 				close(sock.downstreamBuf.in)
 				sock.close()
 				return
 			}
-			sock.downstreamBuf.in <- message
+			sock.downstreamBuf.in <- &msg
 		}
 	}()
 }

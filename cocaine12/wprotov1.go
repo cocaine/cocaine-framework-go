@@ -2,6 +2,8 @@ package cocaine12
 
 import (
 	"fmt"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 const (
@@ -26,23 +28,23 @@ func newV1Protocol() protocolDispather {
 	}
 }
 
-func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) error {
-	if msg.Session == v1UtilitySession {
+func (v *v1Protocol) onMessage(p protocolHandler, msg *message) error {
+	if msg.session == v1UtilitySession {
 		return v.dispatchUtilityMessage(p, msg)
 	}
 
-	if v.maxSession < msg.Session {
+	if v.maxSession < msg.session {
 		// It must be Invkoke
-		if msg.MsgType != v1Invoke {
+		if msg.msgType != v1Invoke {
 			return fmt.Errorf("new session %d must start from invoke type %d, not %d\n",
-				msg.Session, v1Invoke, msg.MsgType)
+				msg.session, v1Invoke, msg.msgType)
 		}
 
-		v.maxSession = msg.Session
+		v.maxSession = msg.session
 		return p.onInvoke(msg)
 	}
 
-	switch msg.MsgType {
+	switch msg.msgType {
 	case v1Write:
 		p.onChunk(msg)
 	case v1Close:
@@ -50,104 +52,83 @@ func (v *v1Protocol) onMessage(p protocolHandler, msg *Message) error {
 	case v1Error:
 		p.onError(msg)
 	default:
-		return fmt.Errorf("an invalid message type: %d, message %v", msg.MsgType, msg)
+		return fmt.Errorf("an invalid message type: %d, message %v", msg.msgType, msg)
 	}
 	return nil
 }
 
-func (v *v1Protocol) isChunk(msg *Message) bool {
-	return msg.MsgType == v1Write
+func (v *v1Protocol) isChunk(msg *message) bool {
+	return msg.msgType == v1Write
 }
 
-func (v *v1Protocol) dispatchUtilityMessage(p protocolHandler, msg *Message) error {
-	switch msg.MsgType {
+func (v *v1Protocol) dispatchUtilityMessage(p protocolHandler, msg *message) error {
+	switch msg.msgType {
 	case v1Heartbeat:
 		p.onHeartbeat(msg)
 	case v1Terminate:
 		p.onTerminate(msg)
 	default:
-		return fmt.Errorf("an invalid utility message type %d", msg.MsgType)
+		return fmt.Errorf("an invalid utility message type %d", msg.msgType)
 	}
 
 	return nil
 }
 
-func (v *v1Protocol) newHandshake(id string) *Message {
+func (v *v1Protocol) newHandshake(id string) *message {
 	return newHandshakeV1(id)
 }
 
-func (v *v1Protocol) newHeartbeat() *Message {
+func (v *v1Protocol) newHeartbeat() *message {
 	return newHeartbeatV1()
 }
 
-func (v *v1Protocol) newChoke(session uint64) *Message {
+func (v *v1Protocol) newChoke(session uint64) *message {
 	return newChokeV1(session)
 }
 
-func (v *v1Protocol) newChunk(session uint64, data []byte) *Message {
+func (v *v1Protocol) newChunk(session uint64, data []byte) *message {
 	return newChunkV1(session, data)
 }
 
-func (v *v1Protocol) newError(session uint64, category, code int, message string) *Message {
-	return newErrorV1(session, category, code, message)
+func (v *v1Protocol) newError(session uint64, category, code int, msg string) *message {
+	return newErrorV1(session, category, code, msg)
 }
 
-func newHandshakeV1(id string) *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: v1UtilitySession,
-			MsgType: v1Handshake,
-		},
-		Payload: []interface{}{id},
-	}
+func newHandshakeV1(id string) *message {
+	payload := msgp.AppendArrayHeader(nil, 1)
+	payload = msgp.AppendString(payload, id)
+	return newMessageRawArgs(v1UtilitySession, v1Handshake, payload, nil)
 }
 
-func newHeartbeatV1() *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: v1UtilitySession,
-			MsgType: v1Heartbeat,
-		},
-		Payload: []interface{}{},
-	}
+func newHeartbeatV1() *message {
+	payload := msgp.AppendArrayHeader(nil, 0)
+	return newMessageRawArgs(v1UtilitySession, v1Heartbeat, payload, nil)
 }
 
-func newInvokeV1(session uint64, event string) *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: session,
-			MsgType: v1Invoke,
-		},
-		Payload: []interface{}{event},
-	}
+func newInvokeV1(session uint64, event string) *message {
+	payload := msgp.AppendArrayHeader(nil, 1)
+	payload = msgp.AppendString(payload, event)
+	return newMessageRawArgs(session, v1Invoke, payload, nil)
 }
 
-func newChunkV1(session uint64, data []byte) *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: session,
-			MsgType: v1Write,
-		},
-		Payload: []interface{}{data},
-	}
+func newChunkV1(session uint64, data []byte) *message {
+	payload := msgp.AppendArrayHeader(nil, 1)
+	payload = msgp.AppendStringFromBytes(payload, data)
+	return newMessageRawArgs(session, v1Write, payload, nil)
 }
 
-func newErrorV1(session uint64, category, code int, message string) *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: session,
-			MsgType: v1Error,
-		},
-		Payload: []interface{}{[2]int{category, code}, message},
-	}
+func newErrorV1(session uint64, category, code int, message string) *message {
+	payload := msgp.AppendArrayHeader(nil, 2)
+	// pack category and code
+	payload = msgp.AppendArrayHeader(payload, 2)
+	payload = msgp.AppendInt(payload, category)
+	payload = msgp.AppendInt(payload, code)
+	// pack error message
+	payload = msgp.AppendString(payload, message)
+	return newMessageRawArgs(session, v1Error, payload, nil)
 }
 
-func newChokeV1(session uint64) *Message {
-	return &Message{
-		CommonMessageInfo: CommonMessageInfo{
-			Session: session,
-			MsgType: v1Close,
-		},
-		Payload: []interface{}{},
-	}
+func newChokeV1(session uint64) *message {
+	payload := msgp.AppendArrayHeader(nil, 0)
+	return newMessageRawArgs(session, v1Close, payload, nil)
 }

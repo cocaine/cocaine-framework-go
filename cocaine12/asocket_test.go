@@ -16,7 +16,7 @@ func TestASocketDrain(t *testing.T) {
 		expected = 3
 	)
 
-	msg := &Message{}
+	msg := &message{}
 	for i := 0; i < expected; i++ {
 		buff.in <- msg
 	}

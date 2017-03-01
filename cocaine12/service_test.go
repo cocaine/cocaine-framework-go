@@ -11,6 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestResolveService(t *testing.T) {
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
+	i, err := serviceResolve(ctx, "locator", nil)
+	assert.NoError(t, err)
+	_ = i
+}
+
 func TestCreateIO(t *testing.T) {
 	if _, err := serviceCreateIO(nil); err != ErrZeroEndpoints {
 		t.Fatalf("%v is expected, but %v has been returned", ErrZeroEndpoints, err)
@@ -37,8 +45,6 @@ func TestCreateIO(t *testing.T) {
 	if len(merr.Error()) == 0 {
 		t.Fatal("merr.Error() is empty")
 	}
-
-	fmt.Println(merr.Error())
 }
 
 func TestService(t *testing.T) {
@@ -51,7 +57,8 @@ func TestService(t *testing.T) {
 		wg                 sync.WaitGroup
 	)
 
-	ctx := context.Background()
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
 	s, err := NewService(ctx, "echo", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -109,8 +116,8 @@ func TestDisconnectedError(t *testing.T) {
 		t.Skip("skipped without Cocaine")
 	}
 
-	ctx := context.Background()
-
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
 	s, err := NewService(ctx, "locator", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -131,8 +138,8 @@ func TestReconnection(t *testing.T) {
 		t.Skip("skipped without Cocaine")
 	}
 
-	ctx := context.Background()
-
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
 	s, err := NewService(ctx, "locator", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +164,8 @@ func TestTimeoutError(t *testing.T) {
 		t.Skip("skipped without Cocaine")
 	}
 
-	ctx := context.Background()
+	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
+	defer c()
 	s, err := NewService(ctx, "locator", nil)
 	if err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/tinylib/msgp/msgp"
 	"github.com/ugorji/go/codec"
 )
 
@@ -13,15 +14,8 @@ var (
 	payloadHandler  = &mPayloadHandler
 )
 
-func convertPayload(in interface{}, out interface{}) error {
-	var buf []byte
-	if err := codec.NewEncoderBytes(&buf, payloadHandler).Encode(in); err != nil {
-		return err
-	}
-	if err := codec.NewDecoderBytes(buf, payloadHandler).Decode(out); err != nil {
-		return err
-	}
-	return nil
+func convertPayload(b msgp.Raw, out interface{}) error {
+	return codec.NewDecoderBytes(b, payloadHandler).Decode(out)
 }
 
 type ReaderWithContext interface {

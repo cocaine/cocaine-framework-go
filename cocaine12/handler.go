@@ -5,12 +5,14 @@ import (
 	"errors"
 	"io"
 	"syscall"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 type request struct {
 	messageTypeDetector
-	fromWorker chan *Message
-	toHandler  chan *Message
+	fromWorker chan *message
+	toHandler  chan *message
 	closed     chan struct{}
 }
 
@@ -36,8 +38,8 @@ var (
 func newRequest(mtd messageTypeDetector) *request {
 	request := &request{
 		messageTypeDetector: mtd,
-		fromWorker:          make(chan *Message),
-		toHandler:           make(chan *Message),
+		fromWorker:          make(chan *message),
+		toHandler:           make(chan *message),
 		closed:              make(chan struct{}),
 	}
 
@@ -64,37 +66,29 @@ func (request *request) Read(ctx context.Context) ([]byte, error) {
 		}
 
 		if request.isChunk(msg) {
-			if result, isByte := msg.Payload[0].([]byte); isByte {
-				return result, nil
+			sz, b, err := msgp.ReadArrayHeaderBytes(msg.payload)
+			if err != nil || sz != 1 {
+				return nil, ErrBadPayload
 			}
-			return nil, ErrBadPayload
+			// NOTE: ZeroCopy unpacking
+			result, _, err := msgp.ReadBytesZC(b)
+			if err != nil {
+				return nil, ErrBadPayload
+			}
+			return result, nil
 		}
 
-		// Error message
-		if len(msg.Payload) == 0 {
-			return nil, ErrMalformedErrorMessage
-		}
-
-		var perr struct {
-			CodeInfo [2]int
-			Message  string
-		}
-
-		if err := convertPayload(msg.Payload, &perr); err != nil {
+		var errRequest = new(ErrRequest)
+		if _, err := errRequest.UnmarshalMsg(msg.payload); err != nil {
 			return nil, err
 		}
-
-		return nil, &ErrRequest{
-			Message:  perr.Message,
-			Category: perr.CodeInfo[0],
-			Code:     perr.CodeInfo[1],
-		}
+		return nil, errRequest
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
 }
 
-func (request *request) push(msg *Message) {
+func (request *request) push(msg *message) {
 	request.fromWorker <- msg
 }
 
@@ -184,18 +178,18 @@ func (r *response) isClosed() bool {
 	return r.closed
 }
 
-func loop(input <-chan *Message, output chan *Message, onclose <-chan struct{}) {
+func loop(input <-chan *message, output chan *message, onclose <-chan struct{}) {
 	defer close(output)
 
 	var (
-		pending []*Message
+		pending []*message
 		closed  = onclose
 	)
 
 	for {
 		var (
-			out   chan *Message
-			first *Message
+			out   chan *message
+			first *message
 		)
 
 		if len(pending) > 0 {
