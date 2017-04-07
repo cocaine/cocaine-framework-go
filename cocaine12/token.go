@@ -13,24 +13,33 @@ const (
 	tokenRefreshTimeout = time.Second * 5
 )
 
+// Token carries information about an authorization token.
 type Token struct {
 	ty   string
 	body string
 }
 
+// Type returns token's type.
+// Depending on the context it can be empty, OAUTH, TVM etc.
 func (t *Token) Type() string {
 	return t.ty
 }
 
+// Body returns token's body.
+// The real body meaning can be determined via token's type.
 func (t *Token) Body() string {
 	return t.body
 }
 
+// TokenManager automates tokens housekeeping, like timely updation to
+// be able to always provide the most fresh tokens.
 type TokenManager interface {
 	Token() Token
 	Stop()
 }
 
+// NullTokenManager represents no-op token manager.
+// It always returns an empty token.
 type NullTokenManager struct{}
 
 func (t *NullTokenManager) Token() Token {
@@ -39,6 +48,7 @@ func (t *NullTokenManager) Token() Token {
 
 func (t *NullTokenManager) Stop() {}
 
+// TicketVendingMachineTokenManager manages TVM tickets.
 type TicketVendingMachineTokenManager struct {
 	appName string
 	ticker  *time.Ticker
