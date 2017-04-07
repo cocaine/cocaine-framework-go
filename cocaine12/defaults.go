@@ -12,6 +12,8 @@ import (
 const (
 	defaultProtocolVersion = 0
 	defaultLocatorEndpoint = "localhost:10053"
+	tokenTypeKey           = "COCAINE_APP_TOKEN_TYPE"
+	tokenBodyKey           = "COCAINE_APP_TOKEN_BODY"
 )
 
 type defaultValues struct {
@@ -21,6 +23,7 @@ type defaultValues struct {
 	protocol int
 	uuid     string
 	debug    bool
+	token    Token
 }
 
 func (d *defaultValues) ApplicationName() string {
@@ -47,6 +50,10 @@ func (d *defaultValues) UUID() string {
 	return d.uuid
 }
 
+func (d *defaultValues) Token() *Token {
+	return &d.token
+}
+
 // DefaultValues provides an interface to read
 // various information provided by Cocaine-Runtime to the worker
 type DefaultValues interface {
@@ -56,6 +63,7 @@ type DefaultValues interface {
 	Locators() []string
 	Protocol() int
 	UUID() string
+	Token() *Token
 }
 
 var (
@@ -113,6 +121,8 @@ func newDefaults(args []string, setname string) *defaultValues {
 	flagSet.StringVar(&values.uuid, "uuid", "", "UUID")
 	flagSet.BoolVar(&showVersion, "showcocaineversion", false, "print framework version")
 	flagSet.Parse(args)
+
+	values.token = Token{os.Getenv(tokenTypeKey), os.Getenv(tokenBodyKey)}
 
 	if showVersion {
 		fmt.Fprintf(os.Stderr, "Built with Cocaine framework %s\n", frameworkVersion)

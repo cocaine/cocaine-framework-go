@@ -20,7 +20,7 @@ func NewWorker() (*Worker, error) {
 
 // Used in tests only
 func newWorker(conn socketIO, id string, protoVersion int, debug bool) (*Worker, error) {
-	impl, err := newWorkerNG(conn, id, protoVersion, debug)
+	impl, err := newWorkerNG(conn, id, protoVersion, debug, new(NullTokenManager))
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +38,11 @@ func (w *Worker) SetDebug(debug bool) {
 // This function must be called before Worker.Run to take effect.
 func (w *Worker) EnableStackSignal(enable bool) {
 	w.impl.EnableStackSignal(enable)
+}
+
+// Token returns the most recently viewed version of the authorization token.
+func (w *Worker) Token() Token {
+	return w.impl.Token()
 }
 
 // SetTerminationHandler allows to attach handler which will be called
