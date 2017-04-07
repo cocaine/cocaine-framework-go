@@ -10,7 +10,7 @@ import (
 
 const (
 	tvmTokenType        = "TVM"
-	tokenRefreshTimeout = time.Second * 5
+	tokenRefreshTimeout = time.Second * 15
 )
 
 // Token carries information about an authorization token.
