@@ -48,7 +48,7 @@ func (d *defaultValues) UUID() string {
 }
 
 // DefaultValues provides an interface to read
-//various information provided by Cocaine-Runtime to the worker
+// various information provided by Cocaine-Runtime to the worker
 type DefaultValues interface {
 	ApplicationName() string
 	Debug() bool
@@ -63,7 +63,7 @@ var (
 	storedDefaults    DefaultValues
 
 	parseDefaultValues = func() {
-		storedDefaults = newDeafults(os.Args[1:], "cocaine")
+		storedDefaults = newDefaults(os.Args[1:], "cocaine")
 	}
 )
 
@@ -94,7 +94,7 @@ func parseLocators(arg string) []string {
 	return strings.Split(arg, ",")
 }
 
-func newDeafults(args []string, setname string) *defaultValues {
+func newDefaults(args []string, setname string) *defaultValues {
 	var (
 		values = new(defaultValues)
 
