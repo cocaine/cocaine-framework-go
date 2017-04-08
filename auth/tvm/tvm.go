@@ -27,10 +27,12 @@ func (f *TicketVendingMachineTokenManagerFactory) Create(appName string, token c
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	t := &TicketVendingMachineTokenManager{
 		appName: appName,
 		ticker:  time.NewTicker(tokenRefreshTimeout),
-		stopped: make(chan struct{}),
+		ctx:     ctx,
+		cancel:  cancel,
 		mu:      sync.Mutex{},
 		ticket:  token,
 		tvm:     tvm,
@@ -45,7 +47,8 @@ func (f *TicketVendingMachineTokenManagerFactory) Create(appName string, token c
 type TicketVendingMachineTokenManager struct {
 	appName string
 	ticker  *time.Ticker
-	stopped chan struct{}
+	ctx     context.Context
+	cancel  context.CancelFunc
 	mu      sync.Mutex
 	ticket  cocaine12.Token
 	tvm     *cocaine12.Service
@@ -58,7 +61,7 @@ func (t *TicketVendingMachineTokenManager) Token() cocaine12.Token {
 }
 
 func (t *TicketVendingMachineTokenManager) Stop() {
-	close(t.stopped)
+	t.cancel()
 }
 
 func (t *TicketVendingMachineTokenManager) run() {
@@ -69,14 +72,13 @@ func (t *TicketVendingMachineTokenManager) run() {
 			body := t.ticket.Body()
 			t.mu.Unlock()
 
-			ctx := context.Background()
-			ch, err := t.tvm.Call(ctx, "refresh_ticket", t.appName, body)
+			ch, err := t.tvm.Call(t.ctx, "refresh_ticket", t.appName, body)
 			if err != nil {
 				fmt.Printf("failed to update ticket %v\n", err)
 				continue
 			}
 
-			answer, err := ch.Get(ctx)
+			answer, err := ch.Get(t.ctx)
 			if err != nil {
 				fmt.Printf("failed to get ticket %v\n", err)
 				continue
@@ -91,7 +93,7 @@ func (t *TicketVendingMachineTokenManager) run() {
 			t.mu.Lock()
 			t.ticket = cocaine12.NewToken(tvmTokenType, ticketResult)
 			t.mu.Unlock()
-		case <-t.stopped:
+		case <-t.ctx.Done():
 			t.ticker.Stop()
 			return
 		}
