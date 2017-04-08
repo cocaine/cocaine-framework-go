@@ -50,8 +50,8 @@ func (d *defaultValues) UUID() string {
 	return d.uuid
 }
 
-func (d *defaultValues) Token() *Token {
-	return &d.token
+func (d *defaultValues) Token() Token {
+	return d.token
 }
 
 // DefaultValues provides an interface to read
@@ -63,7 +63,7 @@ type DefaultValues interface {
 	Locators() []string
 	Protocol() int
 	UUID() string
-	Token() *Token
+	Token() Token
 }
 
 var (

@@ -120,16 +120,16 @@ func NewWorkerNG() (*WorkerNG, error) {
 		return nil, ErrNoCocaineEndpoint
 	}
 
+	tokenManager, err := NewTokenManager(GetDefaults().ApplicationName(), GetDefaults().Token())
+	if err != nil {
+		return nil, fmt.Errorf("unable to create token manager: %v", err)
+	}
+
 	// Connect to cocaine-runtime over a unix socket
 	sock, err := newUnixConnection(unixSocketEndpoint, coreConnectionTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to Cocaine via %s: %v",
 			unixSocketEndpoint, err)
-	}
-
-	tokenManager, err := newTokenManager(GetDefaults().ApplicationName(), GetDefaults().Token())
-	if err != nil {
-		return nil, fmt.Errorf("unable to create token manager: %v", err)
 	}
 
 	return newWorkerNG(sock, workerID,
