@@ -91,6 +91,8 @@ type WorkerNG struct {
 	heartbeatTimer *time.Timer
 	// Timeout to receive a heartbeat reply
 	disownTimer *time.Timer
+	// Token manager
+	tokenManager TokenManager
 	// Map handlers to sessions
 	sessions map[uint64]requestStream
 	// handler
@@ -118,6 +120,11 @@ func NewWorkerNG() (*WorkerNG, error) {
 		return nil, ErrNoCocaineEndpoint
 	}
 
+	tokenManager, err := NewTokenManager(GetDefaults().ApplicationName(), GetDefaults().Token())
+	if err != nil {
+		return nil, fmt.Errorf("unable to create token manager: %v", err)
+	}
+
 	// Connect to cocaine-runtime over a unix socket
 	sock, err := newUnixConnection(unixSocketEndpoint, coreConnectionTimeout)
 	if err != nil {
@@ -127,16 +134,18 @@ func NewWorkerNG() (*WorkerNG, error) {
 
 	return newWorkerNG(sock, workerID,
 		GetDefaults().Protocol(),
-		GetDefaults().Debug())
+		GetDefaults().Debug(),
+		tokenManager)
 }
 
-func newWorkerNG(conn socketIO, id string, protoVersion int, debug bool) (*WorkerNG, error) {
+func newWorkerNG(conn socketIO, id string, protoVersion int, debug bool, tokenManager TokenManager) (*WorkerNG, error) {
 	w := &WorkerNG{
 		conn: conn,
 		id:   id,
 
 		heartbeatTimer: time.NewTimer(heartbeatTimeout),
 		disownTimer:    time.NewTimer(disownTimeout),
+		tokenManager:   tokenManager,
 
 		sessions: make(map[uint64]requestStream),
 
@@ -187,6 +196,11 @@ func (w *WorkerNG) EnableStackSignal(enable bool) {
 	w.stackSignalEnabled = enable
 }
 
+// Token returns the most recently viewed version of the authorization token.
+func (w *WorkerNG) Token() Token {
+	return w.tokenManager.Token()
+}
+
 // Run makes the worker anounce itself to a cocaine-runtime
 // as being ready to hadnle incoming requests and hablde them
 // terminationHandler allows to attach handler which will be called
@@ -203,6 +217,7 @@ func (w *WorkerNG) Stop() {
 		return
 	}
 
+	w.tokenManager.Stop()
 	close(w.stopped)
 	w.conn.Close()
 }

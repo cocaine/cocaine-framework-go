@@ -1,6 +1,7 @@
 package cocaine12
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestParseArgs(t *testing.T) {
 	args := []string{"--locator", "host1:10053,127.0.0.1:10054",
 		"--uuid", "uuid", "--protocol", "1",
 		"--endpoint", "/var/run/cocaine/sock"}
-	def := newDeafults(args, "test")
+	def := newDefaults(args, "test")
 	assert.Equal(t, 1, def.Protocol(), "invalid protocol version")
 	assert.Equal(t, "uuid", def.UUID(), "invalid uuid")
 	assert.Equal(t, "/var/run/cocaine/sock", def.Endpoint(), "invalid endpoint")
@@ -26,9 +27,20 @@ func TestParseArgs(t *testing.T) {
 
 func TestParseArgsWithoutLocators(t *testing.T) {
 	args := []string{}
-	def := newDeafults(args, "test")
+	def := newDefaults(args, "test")
 	assert.Equal(t, 0, def.Protocol(), "invalid protocol version")
 	// assert.Equal(t, "uuid", def.UUID(), "invalid uuid")
 	// assert.Equal(t, "/var/run/cocaine/sock", def.Endpoint(), "invalid endpoint")
 	assert.Equal(t, []string{"localhost:10053"}, def.Locators(), "invalid locators")
+}
+
+func TestParseToken(t *testing.T) {
+	os.Setenv("COCAINE_APP_TOKEN_TYPE", "TVM")
+	os.Setenv("COCAINE_APP_TOKEN_BODY", "very_secret")
+
+	args := []string{}
+	def := newDefaults(args, "test")
+
+	assert.Equal(t, "TVM", def.Token().Type(), "invalid token type")
+	assert.Equal(t, "very_secret", def.Token().Body(), "invalid token body")
 }
