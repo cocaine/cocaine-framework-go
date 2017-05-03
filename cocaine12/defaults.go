@@ -50,6 +50,12 @@ func (d *defaultValues) UUID() string {
 	return d.uuid
 }
 
+func (d *defaultValues) DC() string {
+	// TODO(mechmind): return real DC when cocaine runtime will support this
+	// falling back to "global" if dc location is not available
+	return "global"
+}
+
 func (d *defaultValues) Token() Token {
 	return d.token
 }
@@ -63,6 +69,7 @@ type DefaultValues interface {
 	Locators() []string
 	Protocol() int
 	UUID() string
+	DC() string
 	Token() Token
 }
 
