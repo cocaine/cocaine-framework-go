@@ -1,8 +1,9 @@
 package cocainetest
 
 import (
+	"context"
+
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
-	"golang.org/x/net/context"
 )
 
 type Request struct {

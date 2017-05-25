@@ -2,13 +2,12 @@ package cocaine12
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 const (

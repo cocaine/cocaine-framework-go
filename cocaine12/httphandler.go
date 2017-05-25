@@ -3,10 +3,9 @@ package cocaine12
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
-
-	"golang.org/x/net/context"
 
 	"github.com/ugorji/go/codec"
 )

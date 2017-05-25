@@ -1,9 +1,8 @@
 package cocaine12
 
 import (
+	"context"
 	"testing"
-
-	"golang.org/x/net/context"
 )
 
 func TestLogger(t *testing.T) {

@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +11,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"golang.org/x/net/context"
 
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
 )

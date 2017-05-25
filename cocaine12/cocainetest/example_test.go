@@ -1,10 +1,10 @@
 package cocainetest
 
 import (
+	"context"
 	"fmt"
 
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
-	"golang.org/x/net/context"
 )
 
 func Example() {

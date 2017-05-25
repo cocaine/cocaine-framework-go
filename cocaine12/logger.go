@@ -1,8 +1,6 @@
 package cocaine12
 
-import (
-	"golang.org/x/net/context"
-)
+import "context"
 
 const defaultLoggerName = "logging"
 

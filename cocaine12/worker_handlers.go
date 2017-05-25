@@ -1,9 +1,8 @@
 package cocaine12
 
 import (
+	"context"
 	"fmt"
-
-	"golang.org/x/net/context"
 )
 
 // EventHandler represents a type of handler

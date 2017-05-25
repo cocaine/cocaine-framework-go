@@ -1,11 +1,10 @@
 package cocaine12
 
 import (
+	"context"
 	"errors"
 	"io"
 	"syscall"
-
-	"golang.org/x/net/context"
 )
 
 type request struct {

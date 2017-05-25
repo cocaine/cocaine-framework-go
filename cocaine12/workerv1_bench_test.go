@@ -1,10 +1,9 @@
 package cocaine12
 
 import (
+	"context"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 func genBullets(sock *asyncRWSocket, bullets uint64) {

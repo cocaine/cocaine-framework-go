@@ -1,9 +1,8 @@
 package cocaine12
 
 import (
+	"context"
 	"log"
-
-	"golang.org/x/net/context"
 )
 
 func Example_ApplicationClient() {
