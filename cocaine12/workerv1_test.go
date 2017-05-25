@@ -1,6 +1,7 @@
 package cocaine12
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 )
 
 type pipeConn struct {

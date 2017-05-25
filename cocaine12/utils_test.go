@@ -1,11 +1,10 @@
 package cocaine12
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"testing"
-
-	"golang.org/x/net/context"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -1,9 +1,8 @@
 package cocaine12
 
 import (
+	"context"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 // Locator is used to Resolve new services. It should be closed

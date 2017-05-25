@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,7 +11,6 @@ import (
 
 	cocaine "github.com/cocaine/cocaine-framework-go/cocaine12"
 	"github.com/ugorji/go/codec"
-	"golang.org/x/net/context"
 )
 
 var (

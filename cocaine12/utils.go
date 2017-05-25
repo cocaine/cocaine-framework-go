@@ -2,10 +2,10 @@ package cocaine12
 
 import (
 	"bytes"
+	"context"
 	"io"
 
 	"github.com/ugorji/go/codec"
-	"golang.org/x/net/context"
 )
 
 var (

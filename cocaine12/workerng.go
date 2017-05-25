@@ -1,6 +1,7 @@
 package cocaine12
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,8 +11,6 @@ import (
 	"runtime"
 	"syscall"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 const (

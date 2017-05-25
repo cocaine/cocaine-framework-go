@@ -1,10 +1,9 @@
 package cocaine12
 
 import (
+	"context"
 	"fmt"
 	"sync"
-
-	"golang.org/x/net/context"
 )
 
 const loggerEmit = 0

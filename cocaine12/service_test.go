@@ -1,6 +1,7 @@
 package cocaine12
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 )
 
 func TestCreateIO(t *testing.T) {

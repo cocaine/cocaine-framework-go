@@ -2,10 +2,9 @@ package cocaine12
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
-
-	"golang.org/x/net/context"
 )
 
 type fallbackLogger struct {
