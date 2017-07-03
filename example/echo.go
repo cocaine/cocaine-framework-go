@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/cocaine/cocaine-framework-go/cocaine12"
-	"golang.org/x/net/context"
 	"time"
+
+	"github.com/cocaine/cocaine-framework-go/cocaine12"
 )
 
 func Echo(ctx context.Context, req cocaine12.Request, resp cocaine12.Response) {

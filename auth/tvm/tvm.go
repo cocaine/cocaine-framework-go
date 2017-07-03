@@ -1,12 +1,12 @@
 package tvm
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/cocaine/cocaine-framework-go/cocaine12"
-	"golang.org/x/net/context"
 )
 
 const (

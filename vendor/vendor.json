@@ -1,0 +1,45 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "OFu4xJEIjiI8Suu+j/gabfp+y6Q=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "3104bf5483d3fba84f24933949f0533f4467880b",
+			"revisionTime": "2017-01-19T01:57:21Z"
+		},
+		{
+			"checksumSHA1": "mbhJnsNwGAwkTQH5c2hVRO9YmxA=",
+			"path": "github.com/philhofer/fwd",
+			"revision": "98c11a7a6ec829d672b03833c3d69a7fae1ca972",
+			"revisionTime": "2016-01-29T03:59:39Z"
+		},
+		{
+			"checksumSHA1": "zKKp5SZ3d3ycKe4EKMNT0BqAWBw=",
+			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "3104bf5483d3fba84f24933949f0533f4467880b",
+			"revisionTime": "2017-01-19T01:57:21Z"
+		},
+		{
+			"checksumSHA1": "90Am6VJJxRudklNGXyamS1Xdjyw=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "3104bf5483d3fba84f24933949f0533f4467880b",
+			"revisionTime": "2017-01-19T01:57:21Z"
+		},
+		{
+			"checksumSHA1": "Zy1UALVasGUcLJtvypIWjw71yvo=",
+			"path": "github.com/stretchr/testify/require",
+			"revision": "3104bf5483d3fba84f24933949f0533f4467880b",
+			"revisionTime": "2017-01-19T01:57:21Z"
+		},
+		{
+			"checksumSHA1": "HN3pLd5cC+QXkX8j8FsCCB3FzSI=",
+			"path": "github.com/tinylib/msgp/msgp",
+			"revision": "02d047e07459c5a7b02b1244161d0f2f6d8f660d",
+			"revisionTime": "2017-06-01T17:24:47Z"
+		}
+	],
+	"rootPath": "github.com/cocaine/cocaine-framework-go"
+}
