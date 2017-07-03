@@ -133,11 +133,13 @@ type tx struct {
 	txTree  *streamDescription
 	id      uint64
 	done    bool
-
-	headers CocaineHeaders
 }
 
 func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error {
+	return tx.CallWithHeaders(ctx, nil, name, args)
+}
+
+func (tx *tx) CallWithHeaders(ctx context.Context, headers CocaineHeaders, name string, args ...interface{}) error {
 	if tx.done {
 		return fmt.Errorf("tx is done")
 	}
@@ -159,7 +161,7 @@ func (tx *tx) Call(ctx context.Context, name string, args ...interface{}) error 
 		tx.txTree = temp.Description
 	}
 
-	msg, err := newMessage(tx.id, method, args, tx.headers)
+	msg, err := newMessage(tx.id, method, args, headers)
 	if err != nil {
 		return err
 	}

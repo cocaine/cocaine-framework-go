@@ -19,7 +19,7 @@ func Example_ApplicationClient() {
 	}
 
 	// `enqueue` accepts stream, so send the chunk of data
-	if err := channel.Call(ctx, "write", "AAAAAA"); err != nil {
+	if err = channel.Call(ctx, "write", "AAAAAA"); err != nil {
 		log.Fatal(err)
 	}
 	defer channel.Call(ctx, "close")

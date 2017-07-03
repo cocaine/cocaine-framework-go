@@ -112,7 +112,6 @@ func (s *serviceRes) setError(err error) {
 	s.err = err
 }
 
-//
 type ServiceError struct {
 	Code    int
 	Message string
@@ -268,7 +267,7 @@ func (service *Service) pushDisconnectedError() {
 	}
 }
 
-func (service *Service) call(ctx context.Context, name string, args ...interface{}) (Channel, error) {
+func (service *Service) call(ctx context.Context, headers CocaineHeaders, name string, args ...interface{}) (Channel, error) {
 	service.mutex.RLock()
 	defer service.mutex.RUnlock()
 
@@ -281,7 +280,6 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	}
 
 	var (
-		headers           = make(CocaineHeaders)
 		traceSentCall     = closeDummySpan
 		traceReceivedCall = closeDummySpan
 	)
@@ -294,6 +292,9 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		spanHex := fmt.Sprintf("%x", traceInfo.span)
 		parentHex := fmt.Sprintf("%x", traceInfo.parent)
 
+		if headers == nil {
+			headers = make(CocaineHeaders)
+		}
 		traceInfoToHeaders(headers, traceInfo)
 
 		traceSentCall = func() {
@@ -330,7 +331,6 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 			txTree:  service.ServiceInfo.API[methodNum].Downstream,
 			id:      0,
 			done:    false,
-			headers: headers,
 		},
 	}
 
@@ -366,6 +366,11 @@ func (service *Service) sendMsg(msg *message) {
 
 // Call a remote method by name and pass args
 func (service *Service) Call(ctx context.Context, name string, args ...interface{}) (Channel, error) {
+	return service.CallWithHeaders(ctx, nil, name, args)
+}
+
+// CallWithHeaders calls a remote method by name and pass headers and args
+func (service *Service) CallWithHeaders(ctx context.Context, headers CocaineHeaders, name string, args ...interface{}) (Channel, error) {
 	service.mutex.RLock()
 	disconnected := service.disconnected()
 	service.mutex.RUnlock()
@@ -376,7 +381,7 @@ func (service *Service) Call(ctx context.Context, name string, args ...interface
 		}
 	}
 
-	return service.call(ctx, name, args...)
+	return service.call(ctx, headers, name, args...)
 }
 
 // Close disposes resources of a service. You must call this method if the service isn't used anymore.
