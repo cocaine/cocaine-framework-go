@@ -171,7 +171,8 @@ func TestTimeoutError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), time.Microsecond*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Microsecond*5)
+	defer cancel()
 	// passing wrong arguments leads to disconnect
 	ch, err := s.Call(ctx, "resolve", "locator")
 	if err != nil {
@@ -190,7 +191,8 @@ func TestRxClosedGet(t *testing.T) {
 		t.Skip("skipped without Cocaine")
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	s, err := NewService(ctx, "locator", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -210,6 +212,7 @@ func TestRxClosedGet(t *testing.T) {
 	}
 
 	_, err = ch.Get(ctx)
+	assert.NoError(t, err)
 	_, err = ch.Get(ctx)
 	assert.EqualError(t, err, ErrStreamIsClosed.Error())
 }

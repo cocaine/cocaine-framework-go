@@ -2,173 +2,47 @@ package cocaine12
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tinylib/msgp/msgp"
 	"github.com/ugorji/go/codec"
 )
 
 const (
-	traceID  = 80
-	spanID   = 81
-	parentID = 82
+	traceID  = "trace_id"
+	spanID   = "span_id"
+	parentID = "parent_id"
 )
 
-var (
-	traceValueMap = map[uint64]struct{}{
-		traceID:  struct{}{},
-		spanID:   struct{}{},
-		parentID: struct{}{},
-	}
-)
+func decodeTracingID(s string) (uint64, error) {
+	var tracingID uint64
+	err := binary.Read(strings.NewReader(s), binary.LittleEndian, &tracingID)
+	return tracingID, err
+}
 
-var (
-	ErrInvalidHeaderLength   = errors.New("invalid header size")
-	ErrInvalidHeaderType     = errors.New("invalid header type")
-	ErrInvalidTraceType      = errors.New("invalid trace header number type")
-	ErrInvalidTraceNumber    = errors.New("invalid trace header number")
-	ErrInvalidTraceValueType = errors.New("invalid trace value type")
+func traceInfoToHeaders(h CocaineHeaders, info *TraceInfo) {
+	// TODO: sync.Pool
+	var buff = new(bytes.Buffer)
 
-	ErrNotAllTracesPresent = errors.New("not all trace values present")
-)
+	// NOTE: binary.Write may return an error only from Writer.Write call
+	// As buff wouldn't return it, we can omit the error check
 
-// func getTrace(header interface{}) (uint64, []byte, error) {
-// 	switch t := header.(type) {
-// 	case uint:
-// 		return uint64(t), nil, nil
-// 	case uint32:
-// 		return uint64(t), nil, nil
-// 	case uint64:
-// 		return t, nil, nil
-// 	case int:
-// 		return uint64(t), nil, nil
-// 	case int32:
-// 		return uint64(t), nil, nil
-// 	case int64:
-// 		return uint64(t), nil, nil
-//
-// 	case []interface{}:
-// 		if len(t) != 3 {
-// 			return 0, nil, ErrInvalidHeaderLength
-// 		}
-//
-// 		var (
-// 			traceNum uint64
-// 			traceVal []byte
-// 		)
-//
-// 		switch num := t[1].(type) {
-// 		case uint:
-// 			traceNum = uint64(num)
-// 		case uint32:
-// 			traceNum = uint64(num)
-// 		case uint64:
-// 			traceNum = num
-// 		case int:
-// 			traceNum = uint64(num)
-// 		case int32:
-// 			traceNum = uint64(num)
-// 		case int64:
-// 			traceNum = uint64(num)
-// 		default:
-// 			fmt.Println(reflect.TypeOf(t[1]))
-// 			return 0, nil, ErrInvalidTraceType
-// 		}
-//
-// 		if _, ok := traceValueMap[traceNum]; !ok {
-// 			return 0, nil, ErrInvalidTraceNumber
-// 		}
-//
-// 		switch val := t[2].(type) {
-// 		case []byte:
-// 			traceVal = val
-// 		case string:
-// 			traceVal = []byte(val)
-// 		default:
-// 			return 0, nil, ErrInvalidTraceValueType
-// 		}
-//
-// 		return traceNum, traceVal, nil
-// 	default:
-// 		fmt.Printf("%v\n", reflect.TypeOf(t))
-// 	}
-//
-// 	return 0, nil, ErrInvalidHeaderType
-// }
+	// Pack TraceID
+	binary.Write(buff, binary.LittleEndian, info.trace)
+	h[traceID] = append(h[traceID], buff.String())
+	buff.Reset()
 
-// type CocaineHeaders []interface{}
-// func (h CocaineHeaders) getTraceData() (traceInfo TraceInfo, err error) {
-// 	var i = 0
-// 	for _, header := range h {
-// 		number, buffer, zerr := getTrace(header)
-// 		if zerr != nil {
-// 			continue
-// 		}
-// 		switch number {
-// 		case traceId:
-// 			if traceInfo.trace, err = decodeTracingId(buffer); err != nil {
-// 				return
-// 			}
-//
-// 		case spanId:
-// 			if traceInfo.span, err = decodeTracingId(buffer); err != nil {
-// 				return
-// 			}
-//
-// 		case parentId:
-// 			if buffer == nil {
-// 				traceInfo.parent = 0
-// 			} else {
-// 				if traceInfo.parent, err = decodeTracingId(buffer); err != nil {
-// 					return
-// 				}
-// 			}
-//
-// 		default:
-// 			continue
-// 		}
-//
-// 		i++
-// 		if i == 3 {
-// 			return
-// 		}
-// 	}
-//
-// 	return traceInfo, ErrNotAllTracesPresent
-// }
-//
-// func decodeTracingId(b []byte) (uint64, error) {
-// 	var tracingId uint64
-// 	err := binary.Read(bytes.NewReader(b), binary.LittleEndian, &tracingId)
-// 	return tracingId, err
-// }
-//
-func traceInfoToHeaders(info *TraceInfo) (CocaineHeaders, error) {
-	// var (
-	// 	offset = 0
-	// 	buff   = new(bytes.Buffer)
-	// 	headers = make(CocaineHeaders, 0, 3)
-	// )
+	// Pack SpanID
+	binary.Write(buff, binary.LittleEndian, info.span)
+	h[spanID] = append(h[spanID], buff.String())
+	buff.Reset()
 
-	// if err := binary.Write(buff, binary.LittleEndian, info.trace); err != nil {
-	// 	return headers, err
-	// }
-	// headers = append(headers, []interface{}{false, traceID, buff.Bytes()[offset:]})
-	// offset = buff.Len()
-	//
-	// if err := binary.Write(buff, binary.LittleEndian, info.span); err != nil {
-	// 	return headers, err
-	// }
-	// headers = append(headers, []interface{}{false, spanID, buff.Bytes()[offset:]})
-	// offset = buff.Len()
-	//
-	// if err := binary.Write(buff, binary.LittleEndian, info.parent); err != nil {
-	// 	return headers, err
-	// }
-	// headers = append(headers, []interface{}{false, parentID, buff.Bytes()[offset:]})
-	//
-	return nil, fmt.Errorf("NOT IMPLEMENTED")
+	// Pack ParentID
+	binary.Write(buff, binary.LittleEndian, info.parent)
+	h[parentID] = append(h[parentID], buff.String())
 }
 
 const (
@@ -181,6 +55,8 @@ var (
 	ErrInvalidPayloadType = errors.New("payload must be an ArrayType")
 	// ErrInvalidMessageArraySize returns when the message is shorter than an array of size 3
 	ErrInvalidMessageArraySize = errors.New("size of a message array less than 3")
+
+	ErrNotAllTracesPresent = errors.New("not all trace values present")
 )
 
 var (
@@ -197,23 +73,120 @@ var (
 // CocaineHeaders represents Cocaine HPACK like headers
 type CocaineHeaders map[string][]string
 
-func newCocaineHeaders() CocaineHeaders {
-	return make(CocaineHeaders)
-}
+func (h CocaineHeaders) getTraceData() (tr TraceInfo, err error) {
+	if v := h[traceID]; len(v) > 0 {
+		if tr.trace, err = decodeTracingID(v[0]); err != nil {
+			return tr, fmt.Errorf("failed to decode TraceID: %v", err)
+		}
+	} else {
+		return tr, ErrNotAllTracesPresent
+	}
 
-func (h CocaineHeaders) getTraceData() (TraceInfo, error) {
-	return TraceInfo{}, fmt.Errorf("NOT IMPLEMENTED")
+	if v := h[spanID]; len(v) > 0 {
+		if tr.span, err = decodeTracingID(v[0]); err != nil {
+			return tr, fmt.Errorf("failed to decode SpanID: %v", err)
+		}
+	} else {
+		return tr, ErrNotAllTracesPresent
+	}
+
+	if v := h[parentID]; len(v) > 0 {
+		if tr.parent, err = decodeTracingID(v[0]); err != nil {
+			return tr, fmt.Errorf("failed to decode ParentID: %v", err)
+		}
+	} else {
+		return tr, ErrNotAllTracesPresent
+	}
+
+	return tr, nil
 }
 
 // EncodeMsg is needed to satisfy msgp.Encodable
-func (h CocaineHeaders) EncodeMsg(w *msgp.Writer) error {
-	// return fmt.Errorf("NOT IMPLEMENTED")
-	return w.WriteArrayHeader(0)
+func (h CocaineHeaders) EncodeMsg(w *msgp.Writer) (err error) {
+	if len(h) == 0 {
+		return nil
+	}
+	var sz uint32
+	// TODO: sync.Pool
+	var b []byte
+	for k, v := range h {
+		for _, item := range v {
+			sz++
+			// false key value
+			b = msgp.AppendArrayHeader(b, 3)
+			b = msgp.AppendBool(b, false)
+			b = msgp.AppendString(b, k)
+			b = msgp.AppendString(b, item)
+			msgp.NewWriter(w)
+		}
+	}
+	if err = w.WriteArrayHeader(sz); err != nil {
+		return err
+	}
+	return w.Append(b...)
 }
 
 // DecodeMsg is needed to satisfy msgp.Decodable
-func (h *CocaineHeaders) DecodeMsg(r *msgp.Reader) error {
-	// return fmt.Errorf("NOT IMPLEMENTED")
+func (h CocaineHeaders) DecodeMsg(r *msgp.Reader) error {
+	var sz uint32
+	var err error
+	if sz, err = r.ReadArrayHeader(); err != nil {
+		return fmt.Errorf("failed to read ArrayHeader for headers: %v", err)
+	}
+	// NOTE: it does not support HPACK dynamic table
+	// We assume that all headers arrive as string keys.
+	// Non-supported headers just skipped
+
+	var hsz uint32
+	var headerType msgp.Type
+	for i := uint32(0); i < sz; i++ {
+		if headerType, err = r.NextType(); err != nil {
+			return fmt.Errorf("failed to get msgp.Type for a header: %v", err)
+		}
+		switch headerType {
+		case msgp.IntType, msgp.UintType:
+			// skip headers for HPACK table
+			if err = r.Skip(); err != nil {
+				return fmt.Errorf("failed to Skip unsupported header with HPACK table: %v", err)
+			}
+
+		case msgp.ArrayType:
+			if hsz, err = r.ReadArrayHeader(); err != nil {
+				return fmt.Errorf("failed to read ArrayHeader for a header: %v", err)
+			}
+			if hsz != 3 {
+				return fmt.Errorf("invalid header array length %d", hsz)
+			}
+			if _, err = r.ReadBool(); err != nil {
+				return fmt.Errorf("failed to get Bool flag for a header: %v", err)
+			}
+			var headerKeyType msgp.Type
+			headerKeyType, err = r.NextType()
+			if err != nil {
+				return fmt.Errorf("failed to get NextType for a header name: %v", err)
+			}
+			switch headerKeyType {
+			case msgp.IntType, msgp.UintType:
+				// Skip header key
+				r.Skip()
+				// Skip header value
+				r.Skip()
+			case msgp.BinType, msgp.StrType:
+				var key string
+				if key, err = r.ReadString(); err != nil {
+					return fmt.Errorf("failed to read header key: %v", err)
+				}
+				var value string
+				if value, err = r.ReadString(); err != nil {
+					return fmt.Errorf("failed to read header value: %v", err)
+				}
+				h[key] = append(h[key], value)
+			default:
+				return fmt.Errorf("unsupported header key key: %s", headerKeyType)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -300,9 +273,9 @@ func (m *message) DecodeMsg(r *msgp.Reader) error {
 		return err
 	}
 
-	m.headers = newCocaineHeaders()
 	// decode headers if present
 	if sz >= sizeWithHeaders {
+		m.headers = make(CocaineHeaders)
 		if err = m.headers.DecodeMsg(r); err != nil {
 			return err
 		}

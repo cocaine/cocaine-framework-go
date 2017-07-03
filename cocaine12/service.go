@@ -281,7 +281,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	}
 
 	var (
-		headers           = newCocaineHeaders()
+		headers           = make(CocaineHeaders)
 		traceSentCall     = closeDummySpan
 		traceReceivedCall = closeDummySpan
 	)
@@ -294,11 +294,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		spanHex := fmt.Sprintf("%x", traceInfo.span)
 		parentHex := fmt.Sprintf("%x", traceInfo.parent)
 
-		var err error
-		headers, err = traceInfoToHeaders(traceInfo)
-		if err != nil {
-			traceInfo.getLog().Err("unable to pack trace info into headers")
-		}
+		traceInfoToHeaders(headers, traceInfo)
 
 		traceSentCall = func() {
 			traceInfo.getLog().WithFields(Fields{

@@ -9,6 +9,7 @@ import (
 	"github.com/ugorji/go/codec"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEndpoint(t *testing.T) {
@@ -56,7 +57,6 @@ func TestAPIUnpack(t *testing.T) {
 			assert.True(t, v.Upstream.Type() == otherDispatch)
 
 			for _, descrItem := range *v.Upstream {
-				t.Log(descrItem)
 				switch descrItem.Name {
 				case "write":
 					assert.True(t, descrItem.Description.Type() == recursiveDispatch)
@@ -71,114 +71,48 @@ func TestAPIUnpack(t *testing.T) {
 
 }
 
-//'[]byte{148,1,0,147,161,65,161,66,161,67,147,147,194,80,168,124,0,0,0,0,0,0,0,147,194,81,168,159,134,1,0,0,0,0,0,82}'
 func TestMessageEncodeDecode(t *testing.T) {
-	assrt := assert.New(t)
+	assert := assert.New(t)
+	require := require.New(t)
 	// Payload is packed by Python:
-	// traceid = 124
-	// parentid = 0
-	// spanid=999999
-	// [(False, 80, '|\x00\x00\x00\x00\x00\x00\x00'),
-	// (False, 81, '\x9f\x86\x01\x00\x00\x00\x00\x00'),
-	// 82]
-	// [1, 0, ["A", "B", "C"], z]
-	payload := []byte{148, 100, 101, 147, 161, 65, 161, 66, 161, 67, 147, 147, 194, 80,
-		168, 124, 0, 0, 0, 0, 0, 0, 0, 147, 194, 81, 168, 159, 134, 1, 0, 0, 0, 0, 0, 82}
+	// '[]byte{'+ ', '.join([str(ord(i)) for i in msgpack.packb([1, 0, ["A", "B", "C", 100, 10.],
+	// [100, [False, "trace_id", '|\x00\x00\x00\x00\x00\x00\x00'], [True, 101, ""],
+	// [False, "span_id", '\x9f\x86\x01\x00\x00\x00\x00\x00']]])]) + '}'
+	payload := []byte{148, 1, 0, 149, 161, 65, 161, 66, 161, 67, 100, 203, 64, 36, 0, 0, 0, 0, 0, 0,
+		148, 100, 147, 194, 168, 116, 114, 97, 99, 101, 95, 105, 100, 168, 124,
+		0, 0, 0, 0, 0, 0, 0, 147, 195, 101, 160, 147, 194, 167, 115, 112, 97,
+		110, 95, 105, 100, 168, 159, 134, 1, 0, 0, 0, 0, 0}
 	var msg message
-	assrt.NoError(msg.DecodeMsg(msgp.NewReader(bytes.NewReader(payload))), "DecodeMsg returns non-nil error")
-	assrt.Equal(uint64(100), msg.session, "invalid message session")
-	assrt.Equal(uint64(101), msg.msgType, "invalid message type")
+	require.NoError(msg.DecodeMsg(msgp.NewReader(bytes.NewReader(payload))), "DecodeMsg returns non-nil error")
+	assert.Equal(uint64(1), msg.session, "invalid message session")
+	assert.Equal(uint64(0), msg.msgType, "invalid message type")
 	headers := msg.headers
-	assrt.Equal(3, len(headers), "invalid headers length")
+	// 2 malformed headers are skipped
+	assert.Equal(2, len(headers), "invalid headers length")
 
 	var buff = new(bytes.Buffer)
-	w := msgp.NewWriter(buff)
-	assrt.NoError(msg.EncodeMsg(w), "EncodeMsg returns non-nil error")
-	w.Flush()
-	assrt.Equal(payload, buff.Bytes(), "EncodeMsg diffs from etalon data")
+	assert.NoError(msgp.Encode(buff, &msg), "EncodeMsg returns non-nil error")
+	// 20 - length w/o headers
+	assert.Equal(payload[:20], buff.Bytes()[:20], "EncodeMsg diffs from etalon data")
 }
 
-// func TestHeaders(t *testing.T) {
-// 	var (
-// 		//trace.pack_trace(trace.Trace(traceid=9000, spanid=11000, parentid=8000))
-// 		buff = []byte{
-// 			147, 147, 194, 80, 168, 40, 35, 0, 0, 0, 0, 0, 0, 147, 194, 81, 168,
-// 			248, 42, 0, 0, 0, 0, 0, 0, 147, 194, 82, 168, 64, 31, 0, 0, 0, 0, 0, 0}
-// 		headers CocaineHeaders
-// 	)
-// 	codec.NewDecoderBytes(buff, hAsocket).MustDecode(&headers)
-//
-// 	assert.Equal(t, 3, len(headers))
-// 	for i, header := range headers {
-// 		switch i {
-// 		case 0:
-// 			n, b, err := getTrace(header)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(traceId), n)
-//
-// 			trace, err := decodeTracingId(b)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(9000), trace)
-// 		case 1:
-// 			n, b, err := getTrace(header)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(spanId), n)
-//
-// 			span, err := decodeTracingId(b)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(11000), span)
-// 		case 2:
-// 			n, b, err := getTrace(header)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(parentId), n)
-//
-// 			parent, err := decodeTracingId(b)
-// 			assert.NoError(t, err)
-// 			assert.Equal(t, uint64(8000), parent)
-// 		}
-// 	}
-//
-// 	traceInfo, err := headers.getTraceData()
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, uint64(9000), traceInfo.trace)
-// 	assert.Equal(t, uint64(11000), traceInfo.span)
-// 	assert.Equal(t, uint64(8000), traceInfo.parent)
-// }
-//
-// func TestHeadersPackUnpack(t *testing.T) {
-// 	trace := TraceInfo{
-// 		trace:  uint64(100),
-// 		span:   uint64(200),
-// 		parent: uint64(300),
-// 	}
-//
-// 	headers, err := traceInfoToHeaders(&trace)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, 3, len(headers))
-// 	// t.Logf("%v", headers)
-//
-// 	traceInfo, err := headers.getTraceData()
-// 	if !assert.NoError(t, err) {
-// 		t.Logf("%v", traceInfo)
-// 		t.FailNow()
-// 	}
-//
-// 	assert.Equal(t, trace.trace, traceInfo.trace)
-// 	assert.Equal(t, trace.span, traceInfo.span)
-// 	assert.Equal(t, trace.parent, traceInfo.parent)
-// }
-//
-// func BenchmarkTraceExtract(b *testing.B) {
-// 	var (
-// 		//trace.pack_trace(trace.Trace(traceid=9000, spanid=11000, parentid=8000))
-// 		buff = []byte{
-// 			147, 147, 194, 80, 168, 40, 35, 0, 0, 0, 0, 0, 0, 147, 194, 81, 168,
-// 			248, 42, 0, 0, 0, 0, 0, 0, 147, 194, 82, 168, 64, 31, 0, 0, 0, 0, 0, 0}
-// 		headers CocaineHeaders
-// 	)
-// 	codec.NewDecoderBytes(buff, hAsocket).MustDecode(&headers)
-// 	b.ResetTimer()
-// 	for n := 0; n < b.N; n++ {
-// 		headers.getTraceData()
-// 	}
-// }
+func TestHeadersTraceData(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	trace := TraceInfo{
+		trace:  uint64(100),
+		span:   uint64(200),
+		parent: uint64(300),
+	}
+
+	headers := make(CocaineHeaders)
+	traceInfoToHeaders(headers, &trace)
+	assert.Equal(3, len(headers))
+
+	traceInfo, err := headers.getTraceData()
+	require.NoError(err)
+
+	assert.Equal(trace.trace, traceInfo.trace)
+	assert.Equal(trace.span, traceInfo.span)
+	assert.Equal(trace.parent, traceInfo.parent)
+}
