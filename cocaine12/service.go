@@ -54,6 +54,7 @@ type ServiceResult interface {
 	ExtractTuple(...interface{}) error
 	Result() (uint64, []interface{}, error)
 	Err() error
+	Headers() CocaineHeaders
 
 	setError(error)
 }
@@ -61,6 +62,7 @@ type ServiceResult interface {
 type serviceRes struct {
 	payload msgp.Raw
 	method  uint64
+	headers CocaineHeaders
 	err     error
 }
 
@@ -99,6 +101,10 @@ func (s *serviceRes) Result() (uint64, []interface{}, error) {
 //Error status
 func (s *serviceRes) Err() error {
 	return s.err
+}
+
+func (s *serviceRes) Headers() CocaineHeaders {
+	return s.headers
 }
 
 func (s *serviceRes) Error() string {
@@ -207,6 +213,7 @@ func (service *Service) loop() {
 			rx.push(&serviceRes{
 				payload: data.payload,
 				method:  data.msgType,
+				headers: data.headers,
 			})
 		}
 	}
