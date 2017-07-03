@@ -7,6 +7,9 @@ import (
 )
 
 func TestLogger(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped w/o cocaine runtime")
+	}
 	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
 	defer c()
 	log, err := newCocaineLogger(ctx, defaultLoggerName)

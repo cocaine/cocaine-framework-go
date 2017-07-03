@@ -12,11 +12,13 @@ import (
 )
 
 func TestResolveService(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipped without Cocaine")
+	}
 	ctx, c := context.WithTimeout(context.Background(), time.Second*3)
 	defer c()
-	i, err := serviceResolve(ctx, "locator", nil)
+	_, err := serviceResolve(ctx, "locator", nil)
 	assert.NoError(t, err)
-	_ = i
 }
 
 func TestCreateIO(t *testing.T) {
