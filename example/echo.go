@@ -11,14 +11,20 @@ import (
 func Echo(ctx context.Context, req cocaine12.Request, resp cocaine12.Response) {
 	defer resp.Close()
 
+	// Headers arrived with Invoke message
+	_ = req.Headers()
+
 	ctx, done := cocaine12.NewSpan(ctx, "echo")
 	defer done()
 
+	// Read call resets associated headers
 	body, err := req.Read(ctx)
 	if err != nil {
 		resp.ErrorMsg(999, err.Error())
 		return
 	}
+	// Headers arrived with next chunk
+	_ = req.Headers()
 
 	time.Sleep(time.Millisecond * 100)
 	resp.Write(body)

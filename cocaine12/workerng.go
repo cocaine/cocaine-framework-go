@@ -44,6 +44,12 @@ type requestStream interface {
 
 // Request provides an interface for a handler to get data
 type Request interface {
+	// Headers returns associated headers.
+	// The value is shared accross all callers.
+	// Read call overrides headers with headers from a new message
+	Headers() CocaineHeaders
+	// Read returns binary user's data and resets headers.
+	// To get headers from incoming message call Headers method after Read
 	Read(ctx context.Context) ([]byte, error)
 }
 
@@ -354,17 +360,14 @@ func (w *WorkerNG) onInvoke(msg *message) error {
 
 	var (
 		currentSession = msg.session
-		ctx            context.Context
+		ctx            = context.Background()
 	)
-
-	ctx = context.Background()
-
 	if traceInfo, err := msg.headers.getTraceData(); err == nil {
 		ctx = AttachTraceInfo(ctx, traceInfo)
 	}
 
 	responseStream := newResponse(w.dispatcher, currentSession, w.conn)
-	requestStream := newRequest(w.dispatcher)
+	requestStream := newRequest(w.dispatcher, msg.headers)
 	w.sessions[currentSession] = requestStream
 
 	go func() {
@@ -391,6 +394,7 @@ func (w *WorkerNG) onHeartbeat(msg *message) {
 func (w *WorkerNG) onTerminate(msg *message) {
 	if w.terminationHandler != nil {
 		ctx, cancelTimeout := context.WithTimeout(context.Background(), terminationTimeout)
+		defer cancelTimeout()
 		onDone := make(chan struct{})
 		go func() {
 			w.terminationHandler(ctx)
@@ -399,7 +403,6 @@ func (w *WorkerNG) onTerminate(msg *message) {
 
 		select {
 		case <-onDone:
-			cancelTimeout()
 		case <-ctx.Done():
 			fmt.Printf("terminationHandler timeouted: %v\n", ctx.Err())
 		}

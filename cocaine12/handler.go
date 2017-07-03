@@ -11,6 +11,7 @@ import (
 
 type request struct {
 	messageTypeDetector
+	headers    CocaineHeaders
 	fromWorker chan *message
 	toHandler  chan *message
 	closed     chan struct{}
@@ -35,12 +36,13 @@ var (
 	}
 )
 
-func newRequest(mtd messageTypeDetector) *request {
+func newRequest(mtd messageTypeDetector, headers CocaineHeaders) *request {
 	request := &request{
 		messageTypeDetector: mtd,
 		fromWorker:          make(chan *message),
 		toHandler:           make(chan *message),
 		closed:              make(chan struct{}),
+		headers:             headers,
 	}
 
 	go loop(
@@ -55,6 +57,13 @@ func newRequest(mtd messageTypeDetector) *request {
 	return request
 }
 
+// Headers returns current associated headers. Next Read call
+// will override associated headers.
+// Multiple calls of the method returns the same shared Headers value.
+func (request *request) Headers() CocaineHeaders {
+	return request.headers
+}
+
 func (request *request) Read(ctx context.Context) ([]byte, error) {
 	select {
 	// Choke never reaches this select,
@@ -64,6 +73,9 @@ func (request *request) Read(ctx context.Context) ([]byte, error) {
 		if !ok {
 			return nil, ErrStreamIsClosed
 		}
+
+		// reset current headers
+		request.headers = msg.headers
 
 		if request.isChunk(msg) {
 			sz, b, err := msgp.ReadArrayHeaderBytes(msg.payload)
