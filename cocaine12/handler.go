@@ -113,6 +113,7 @@ type response struct {
 	session  uint64
 	toWorker asyncSender
 	closed   bool
+	headers  CocaineHeaders
 }
 
 func newResponse(h handlerProtocolGenerator, session uint64, toWorker asyncSender) *response {
@@ -124,6 +125,14 @@ func newResponse(h handlerProtocolGenerator, session uint64, toWorker asyncSende
 	}
 
 	return response
+}
+
+// SetHeaders sets headers to send with next Write/Close/ZeroCopyWrite
+// TODO: may be it should look like http.ResponseWriter
+// it provides Headers() method to return writable value of the headers
+// which will be sent with next Write
+func (r *response) SetHeaders(headers CocaineHeaders) {
+	r.headers = headers
 }
 
 // Write sends chunk of data to a client.
@@ -146,7 +155,12 @@ func (r *response) ZeroCopyWrite(data []byte) error {
 		return io.ErrClosedPipe
 	}
 
-	r.toWorker.Send(r.newChunk(r.session, data))
+	msg := r.newChunk(r.session, data)
+	if r.headers != nil {
+		msg.headers = r.headers
+		r.headers = nil
+	}
+	r.toWorker.Send(msg)
 	return nil
 }
 
@@ -158,7 +172,13 @@ func (r *response) Close() error {
 	}
 
 	r.close()
-	r.toWorker.Send(r.newChoke(r.session))
+
+	msg := r.newChoke(r.session)
+	if r.headers != nil {
+		msg.headers = r.headers
+		r.headers = nil
+	}
+	r.toWorker.Send(msg)
 	return nil
 }
 
@@ -169,7 +189,8 @@ func (r *response) ErrorMsg(code int, message string) error {
 	}
 
 	r.close()
-	r.toWorker.Send(r.newError(
+
+	msg := r.newError(
 		// current session number
 		r.session,
 		// category
@@ -178,7 +199,12 @@ func (r *response) ErrorMsg(code int, message string) error {
 		code,
 		// error message
 		message,
-	))
+	)
+	if r.headers != nil {
+		msg.headers = r.headers
+		r.headers = nil
+	}
+	r.toWorker.Send(msg)
 	return nil
 }
 

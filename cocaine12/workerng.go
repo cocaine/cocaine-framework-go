@@ -56,6 +56,9 @@ type Request interface {
 // ResponseStream provides an interface for a handler to reply
 type ResponseStream interface {
 	io.WriteCloser
+	// SetHeaders sets the headers to send with next message
+	// NOTE: it's experimental API
+	SetHeaders(CocaineHeaders)
 	// ZeroCopyWrite sends data to a client.
 	// Response takes the ownership of the buffer, so provided buffer must not be edited.
 	ZeroCopyWrite(data []byte) error

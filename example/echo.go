@@ -24,10 +24,16 @@ func Echo(ctx context.Context, req cocaine12.Request, resp cocaine12.Response) {
 		return
 	}
 	// Headers arrived with next chunk
-	_ = req.Headers()
+	h := req.Headers()
 
 	time.Sleep(time.Millisecond * 100)
+	// those headers will be sent with next Write
+	resp.SetHeaders(h)
 	resp.Write(body)
+
+	h["A"] = []string{"B", "C"}
+	// defer Close will sent those headers
+	resp.SetHeaders(h)
 }
 
 func main() {
