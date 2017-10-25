@@ -135,16 +135,16 @@ func TestHeaders(t *testing.T) {
 
 	traceInfo, err := headers.getTraceData()
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(9000), traceInfo.trace)
-	assert.Equal(t, uint64(11000), traceInfo.span)
-	assert.Equal(t, uint64(8000), traceInfo.parent)
+	assert.Equal(t, uint64(9000), traceInfo.Trace)
+	assert.Equal(t, uint64(11000), traceInfo.Span)
+	assert.Equal(t, uint64(8000), traceInfo.Parent)
 }
 
 func TestHeadersPackUnpack(t *testing.T) {
 	trace := TraceInfo{
-		trace:  uint64(100),
-		span:   uint64(200),
-		parent: uint64(300),
+		Trace:  uint64(100),
+		Span:   uint64(200),
+		Parent: uint64(300),
 	}
 
 	headers, err := traceInfoToHeaders(&trace)
@@ -158,9 +158,9 @@ func TestHeadersPackUnpack(t *testing.T) {
 		t.FailNow()
 	}
 
-	assert.Equal(t, trace.trace, traceInfo.trace)
-	assert.Equal(t, trace.span, traceInfo.span)
-	assert.Equal(t, trace.parent, traceInfo.parent)
+	assert.Equal(t, trace.Trace, traceInfo.Trace)
+	assert.Equal(t, trace.Span, traceInfo.Span)
+	assert.Equal(t, trace.Parent, traceInfo.Parent)
 }
 
 func BenchmarkTraceExtract(b *testing.B) {
