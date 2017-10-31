@@ -20,7 +20,7 @@ var (
 	closeDummySpan CloseSpan = func() {}
 )
 
-func getTraceInfo(ctx context.Context) *TraceInfo {
+func GetTraceInfo(ctx context.Context) *TraceInfo {
 	if val, ok := ctx.Value(TraceInfoValue).(TraceInfo); ok {
 		return &val
 	}
@@ -32,7 +32,7 @@ func getTraceInfo(ctx context.Context) *TraceInfo {
 type CloseSpan func()
 
 type TraceInfo struct {
-	trace, span, parent uint64
+	Trace, Span, Parent uint64
 	logger              Logger
 }
 
@@ -77,9 +77,9 @@ func BeginNewTraceContext(ctx context.Context) context.Context {
 func BeginNewTraceContextWithLogger(ctx context.Context, logger Logger) context.Context {
 	ts := uint64(rand.Int63())
 	return AttachTraceInfo(ctx, TraceInfo{
-		trace:  ts,
-		span:   ts,
-		parent: 0,
+		Trace:  ts,
+		Span:   ts,
+		Parent: 0,
 		logger: logger,
 	})
 }
@@ -117,7 +117,7 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 		return context.Background(), closeDummySpan
 	}
 
-	traceInfo := getTraceInfo(ctx)
+	traceInfo := GetTraceInfo(ctx)
 	if traceInfo == nil {
 		// given context has no TraceInfo
 		// so we can't start new trace to support sampling.
@@ -141,13 +141,13 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 	// * the previous span becomes our parent
 	// * new span is set as random number
 	// * trace still stays the same
-	traceInfo.parent = traceInfo.span
-	traceInfo.span = uint64(rand.Int63())
+	traceInfo.Parent = traceInfo.Span
+	traceInfo.Span = uint64(rand.Int63())
 
 	traceInfo.getLog().WithFields(Fields{
-		"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
-		"span_id":        fmt.Sprintf("%x", traceInfo.span),
-		"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
+		"trace_id":       fmt.Sprintf("%x", traceInfo.Trace),
+		"span_id":        fmt.Sprintf("%x", traceInfo.Span),
+		"parent_id":      fmt.Sprintf("%x", traceInfo.Parent),
 		"real_timestamp": startTime.UnixNano() / 1000,
 		"rpc_name":       rpcName,
 	}).Infof("start")
@@ -162,9 +162,9 @@ func NewSpan(ctx context.Context, rpcNameFormat string, args ...interface{}) (co
 		now := time.Now()
 		duration := now.Sub(startTime)
 		traceInfo.getLog().WithFields(Fields{
-			"trace_id":       fmt.Sprintf("%x", traceInfo.trace),
-			"span_id":        fmt.Sprintf("%x", traceInfo.span),
-			"parent_id":      fmt.Sprintf("%x", traceInfo.parent),
+			"trace_id":       fmt.Sprintf("%x", traceInfo.Trace),
+			"span_id":        fmt.Sprintf("%x", traceInfo.Span),
+			"parent_id":      fmt.Sprintf("%x", traceInfo.Parent),
 			"real_timestamp": now.UnixNano() / 1000,
 			"duration":       duration.Nanoseconds() / 1000,
 			"rpc_name":       rpcName,

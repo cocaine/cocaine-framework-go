@@ -115,20 +115,20 @@ func (h CocaineHeaders) getTraceData() (traceInfo TraceInfo, err error) {
 		}
 		switch number {
 		case traceId:
-			if traceInfo.trace, err = decodeTracingId(buffer); err != nil {
+			if traceInfo.Trace, err = decodeTracingId(buffer); err != nil {
 				return
 			}
 
 		case spanId:
-			if traceInfo.span, err = decodeTracingId(buffer); err != nil {
+			if traceInfo.Span, err = decodeTracingId(buffer); err != nil {
 				return
 			}
 
 		case parentId:
 			if buffer == nil {
-				traceInfo.parent = 0
+				traceInfo.Parent = 0
 			} else {
-				if traceInfo.parent, err = decodeTracingId(buffer); err != nil {
+				if traceInfo.Parent, err = decodeTracingId(buffer); err != nil {
 					return
 				}
 			}
@@ -159,19 +159,19 @@ func traceInfoToHeaders(info *TraceInfo) (CocaineHeaders, error) {
 		headers = make(CocaineHeaders, 0, 3)
 	)
 
-	if err := binary.Write(buff, binary.LittleEndian, info.trace); err != nil {
+	if err := binary.Write(buff, binary.LittleEndian, info.Trace); err != nil {
 		return headers, err
 	}
 	headers = append(headers, []interface{}{false, traceId, buff.Bytes()[offset:]})
 	offset = buff.Len()
 
-	if err := binary.Write(buff, binary.LittleEndian, info.span); err != nil {
+	if err := binary.Write(buff, binary.LittleEndian, info.Span); err != nil {
 		return headers, err
 	}
 	headers = append(headers, []interface{}{false, spanId, buff.Bytes()[offset:]})
 	offset = buff.Len()
 
-	if err := binary.Write(buff, binary.LittleEndian, info.parent); err != nil {
+	if err := binary.Write(buff, binary.LittleEndian, info.Parent); err != nil {
 		return headers, err
 	}
 	headers = append(headers, []interface{}{false, parentId, buff.Bytes()[offset:]})

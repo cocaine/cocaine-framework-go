@@ -272,13 +272,13 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		traceReceivedCall = closeDummySpan
 	)
 
-	if traceInfo := getTraceInfo(ctx); traceInfo != nil {
+	if traceInfo := GetTraceInfo(ctx); traceInfo != nil {
 
 		// eval it once here, to reuse later in traceReceived/Sent
 		RPCName := fmt.Sprintf("%s %s: calling %s", service.name, service.id, name)
-		traceHex := fmt.Sprintf("%x", traceInfo.trace)
-		spanHex := fmt.Sprintf("%x", traceInfo.span)
-		parentHex := fmt.Sprintf("%x", traceInfo.parent)
+		traceHex := fmt.Sprintf("%x", traceInfo.Trace)
+		spanHex := fmt.Sprintf("%x", traceInfo.Span)
+		parentHex := fmt.Sprintf("%x", traceInfo.Parent)
 
 		var err error
 		headers, err = traceInfoToHeaders(traceInfo)
