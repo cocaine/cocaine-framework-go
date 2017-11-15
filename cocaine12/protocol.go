@@ -15,6 +15,10 @@ const (
 )
 
 var (
+	traceIdName  = []byte("trace_id")
+	spanIdName   = []byte("span_id")
+	parentIdName = []byte("parent_id")
+
 	traceValueMap = map[uint64]struct{}{
 		traceId:  struct{}{},
 		spanId:   struct{}{},
@@ -78,6 +82,12 @@ func getTrace(header interface{}) (uint64, []byte, error) {
 			traceNum = uint64(num)
 		case int64:
 			traceNum = uint64(num)
+		case []byte:
+			decodedTraceNum, err := decodeRawTraceName(num)
+			if err != nil {
+				return 0, nil, err
+			}
+			traceNum = decodedTraceNum
 		default:
 			fmt.Println(reflect.TypeOf(t[1]))
 			return 0, nil, ErrInvalidTraceType
@@ -102,6 +112,17 @@ func getTrace(header interface{}) (uint64, []byte, error) {
 	}
 
 	return 0, nil, ErrInvalidHeaderType
+}
+
+func decodeRawTraceName(name []byte) (uint64, error) {
+	if bytes.Equal(name, traceIdName) {
+		return traceId, nil
+	} else if bytes.Equal(name, spanIdName) {
+		return spanId, nil
+	} else if bytes.Equal(name, parentIdName) {
+		return parentId, nil
+	}
+	return 0, ErrInvalidTraceType
 }
 
 type CocaineHeaders []interface{}
