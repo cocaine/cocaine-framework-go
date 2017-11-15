@@ -75,7 +75,7 @@ func TestMessageUnpack(t *testing.T) {
 	// Payload is packed by Python:
 	// traceid = 124
 	// parentid = 0
-	// spanid=999999
+	// spanid=99999
 	// [(False, 80, '|\x00\x00\x00\x00\x00\x00\x00'),
 	// (False, 81, '\x9f\x86\x01\x00\x00\x00\x00\x00'),
 	// 82]
@@ -91,6 +91,47 @@ func TestMessageUnpack(t *testing.T) {
 	assert.Equal(t, uint64(101), message.MsgType)
 	headers := message.Headers
 	assert.Equal(t, 3, len(headers))
+
+	traceInfo, err := headers.getTraceData()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(124), traceInfo.Trace)
+	assert.Equal(t, uint64(99999), traceInfo.Span)
+	assert.Equal(t, uint64(0), traceInfo.Parent)
+}
+
+func TestMessageUnpackTraceAsString(t *testing.T) {
+	// Payload is packed by Python:
+	// trace_id = 124
+	// parent_id = 124
+	// span_id=99999
+	// [
+	//     (False, 'trace_id', '|\x00\x00\x00\x00\x00\x00\x00'),
+	//     (False, 'span_id', '\x9f\x86\x01\x00\x00\x00\x00\x00'),
+	//	   (False, 'parent_id', '|\x00\x00\x00\x00\x00\x00\x00'),
+	// ]
+	// [1, 0, ["A", "B", "C"], z]
+	payload := []byte{
+		148, 100, 101, 147, 161, 65, 161, 66, 161, 67, 147, 147, 194, 168, 116,
+		114, 97, 99, 101, 95, 105, 100, 168, 124, 0, 0, 0, 0, 0, 0, 0, 147, 194,
+		167, 115, 112, 97, 110, 95, 105, 100, 168, 159, 134, 1, 0, 0, 0, 0, 0,
+		147, 194, 169, 112, 97, 114, 101, 110, 116, 95, 105, 100, 168, 124, 0, 0,
+		0, 0, 0, 0, 0,
+	}
+	decoder := codec.NewDecoder(bytes.NewReader(payload), hAsocket)
+
+	var message Message
+	decoder.MustDecode(&message)
+
+	assert.Equal(t, uint64(100), message.Session)
+	assert.Equal(t, uint64(101), message.MsgType)
+	headers := message.Headers
+	assert.Equal(t, 3, len(headers))
+
+	traceInfo, err := headers.getTraceData()
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(124), traceInfo.Trace)
+	assert.Equal(t, uint64(99999), traceInfo.Span)
+	assert.Equal(t, uint64(124), traceInfo.Parent)
 }
 
 func TestHeaders(t *testing.T) {
