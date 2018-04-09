@@ -190,8 +190,8 @@ func (service *Service) loop() {
 	epoch := service.epoch
 
 	for data := range service.socketIO.Read() {
-		if rx, ok := service.sessions.Get(data.Session); ok {
-			rx.push(&serviceRes{
+		if ch, ok := service.sessions.Get(data.Session); ok {
+			ch.push(&serviceRes{
 				payload: data.Payload,
 				method:  data.MsgType,
 			})
