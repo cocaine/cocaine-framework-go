@@ -42,8 +42,10 @@ func (ch *channel) Call(ctx context.Context, name string, args ...interface{}) e
 }
 
 type rx struct {
+	service    *Service
 	pushBuffer chan ServiceResult
 	rxTree     *streamDescription
+	id         uint64
 
 	sync.Mutex
 	queue []ServiceResult
@@ -127,6 +129,12 @@ func (rx *rx) push(res ServiceResult) {
 	default:
 	}
 	rx.Unlock()
+
+	treeMap := *(rx.rxTree)
+	method, _, _ := res.Result()
+	if temp := treeMap[method]; temp.Description.Type() == emptyDispatch {
+		rx.service.sessions.Detach(rx.id)
+	}
 }
 
 type tx struct {

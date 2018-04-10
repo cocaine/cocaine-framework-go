@@ -190,8 +190,8 @@ func (service *Service) loop() {
 	epoch := service.epoch
 
 	for data := range service.socketIO.Read() {
-		if rx, ok := service.sessions.Get(data.Session); ok {
-			rx.push(&serviceRes{
+		if ch, ok := service.sessions.Get(data.Session); ok {
+			ch.push(&serviceRes{
 				payload: data.Payload,
 				method:  data.MsgType,
 			})
@@ -242,15 +242,12 @@ func (service *Service) Reconnect(ctx context.Context, force bool) error {
 
 func (service *Service) pushDisconnectedError() {
 	for _, key := range service.sessions.Keys() {
-		service.sessions.RLock()
 		if ch, ok := service.sessions.Get(key); ok {
 			ch.push(&serviceRes{
 				payload: nil,
 				method:  1,
 				err:     &ServiceError{ErrDisconnected, "Disconnected"}})
 		}
-		service.sessions.RUnlock()
-		service.sessions.Detach(key)
 	}
 }
 
@@ -311,8 +308,10 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 		traceReceived: traceReceivedCall,
 		traceSent:     traceSentCall,
 		rx: rx{
+			service:    service,
 			pushBuffer: make(chan ServiceResult, 1),
 			rxTree:     service.ServiceInfo.API[methodNum].Upstream,
+			id:         0,
 			done:       false,
 		},
 		tx: tx{
@@ -330,6 +329,7 @@ func (service *Service) call(ctx context.Context, name string, args ...interface
 	defer service.muKeepSessionOrder.Unlock()
 
 	ch.tx.id = service.sessions.Attach(&ch)
+	ch.rx.id = ch.tx.id
 
 	msg := &Message{
 		CommonMessageInfo: CommonMessageInfo{ch.tx.id, methodNum},
